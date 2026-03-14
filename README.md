@@ -6,7 +6,7 @@
 
 ## PROJECT OVERVIEW
 
-Draft16 is a full-stack creative workspace for rappers and lyricists that allows users to write lyrics, attach beats, and manage songwriting sessions in one place.
+Draft16 is a full-stack creative workspace for rappers and lyricists. Users can write lyrics, attach beats, and manage their songwriting sessions all in one place.
 
 ---
 
@@ -34,74 +34,111 @@ Draft16 is a full-stack creative workspace for rappers and lyricists that allows
 
 ## FEATURES
 
-**User Authentication**
-- Signup
-- Login
-- Protected routes
+### User Authentication
+- Signup with username, email, and password
+- Login with JWT token stored in `localStorage`
+- Protected routes — unauthenticated users are redirected to `/login`
+- Dynamic Navbar showing Login/Signup for guests and Dashboard/Logout for authenticated users
 
-**Songwriting Sessions**
-- Create session
-- Edit lyrics
-- Attach beat URLs
-- Save sessions
+### Songwriting Sessions (CRUD)
+- Create new sessions with a title and optional beat URL
+- Edit lyrics inside the session editor
+- Attach YouTube beat URLs to sessions
+- Save session changes via the backend API
+- Delete sessions from the dashboard
 
-**Dashboard**
-- View sessions
-- Open sessions
-- Manage drafts
+### Dashboard
+- View all your sessions in a responsive card grid
+- Open any session to edit
+- Navigate to create a new session
 
-**Session Editor**
-- Lyrics editor
-- Beat URL integration
-- Save changes
+### Session Editor
+- Large lyrics textarea for focused writing
+- Beat source selector (YouTube / External / Upload)
+- Beat URL input field
+- YouTube beat player — paste a YouTube URL and the beat plays inline while you write
+- Save changes button with loading state
 
-**Beat Playback**
-- Embedded YouTube beat player inside the writing workspace.
+### Beat Playback (Step 8)
+- `BeatPlayer.jsx` component that accepts `beatSource` and `beatUrl` as props
+- Uses a `extractVideoId()` helper to parse both standard and shortened YouTube URLs
+- Renders a responsive embedded YouTube iframe directly inside the Session Editor
+- Player only renders if `beatSource === "youtube"` and a valid URL is provided
 
 ---
 
 ## PROJECT STRUCTURE
 
-```text
+```
 draft16
-├ client
-│   ├ src
-│   │   ├ components
-│   │   ├ pages
-│   │   ├ services
-│   │   └ utils
+├── client
+│   └── src
+│       ├── components
+│       │   ├── BeatPlayer.jsx       ← YouTube iframe player
+│       │   ├── Navbar.jsx           ← Auth-aware navigation
+│       │   └── SessionCard.jsx
+│       ├── pages
+│       │   ├── Home.jsx
+│       │   ├── Login.jsx            ← Full login form + JWT flow
+│       │   ├── Signup.jsx           ← Full signup form + JWT flow
+│       │   ├── Dashboard.jsx        ← Protected page
+│       │   ├── NewSession.jsx
+│       │   └── SessionEditor.jsx    ← Beat player integrated here
+│       ├── services
+│       │   ├── api.js               ← Axios base instance
+│       │   ├── authService.js       ← login() + signup() API calls
+│       │   └── sessionService.js    ← CRUD API calls
+│       └── utils
+│           └── auth.js              ← getToken / setToken / removeToken
 │
-└ server
-├ controllers
-├ models
-├ routes
-├ middleware
-└ config
+└── server
+    ├── controllers
+    ├── models
+    ├── routes
+    ├── middleware
+    └── config
 ```
 
 ---
 
 ## API OVERVIEW
 
-**Auth Routes**
-- `POST /api/auth/signup`
-- `POST /api/auth/login`
+### Auth Routes
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/auth/signup` | Register a new user |
+| POST | `/api/auth/login` | Login and receive JWT |
 
-**Session Routes**
-- `GET /api/sessions`
-- `POST /api/sessions`
-- `GET /api/sessions/:id`
-- `PUT /api/sessions/:id`
-- `DELETE /api/sessions/:id`
+### Session Routes
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/sessions` | Get all sessions for user |
+| POST | `/api/sessions` | Create a new session |
+| GET | `/api/sessions/:id` | Get a single session |
+| PUT | `/api/sessions/:id` | Update session |
+| DELETE | `/api/sessions/:id` | Delete session |
+
+All session routes are protected and require `Authorization: Bearer <token>` header.
+
+---
+
+## HOW IT WORKS
+
+1. User registers or logs in → JWT is saved in `localStorage`
+2. Navbar detects the token and shows authenticated links
+3. User creates a session from the Dashboard
+4. In the Session Editor, user writes lyrics and pastes a YouTube beat URL
+5. The `BeatPlayer` component parses the URL, extracts the video ID, and embeds the YouTube player
+6. User saves the session — title, lyrics, and beat URL are persisted to MongoDB
 
 ---
 
 ## FUTURE IMPROVEMENTS
 
 - Autosave lyrics
-- Audio beat uploads
+- Audio beat uploads (file upload support)
 - Voice demo recording
-- Session search
+- Session search and filtering
 - Real-time collaboration
 
 ---
