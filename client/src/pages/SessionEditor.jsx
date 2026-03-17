@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getSessionById, updateSession } from '../services/sessionService';
-import { uploadBeat } from '../services/uploadService';
+import { uploadAudio } from '../services/uploadService';
 import { getRhymes } from '../services/rhymeService';
 import BeatPlayer from '../components/BeatPlayer';
 import { startMetronome } from '../utils/metronome';
@@ -393,6 +393,8 @@ const SessionEditor = () => {
   const clickAudioRef = useRef(typeof Audio !== 'undefined' ? new Audio('/metronome-click.wav') : null);
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
+  const beatAudioSourceRef = useRef(null); // cached MediaElementSource for uploaded beat
+  const [recordingMode, setRecordingMode] = useState(null); // null | 'mic+beat' | 'mic-only'
   
   const currentDraft = drafts[activeDraftIndex] || { content: '' };
   const lyrics = currentDraft.content;
@@ -577,7 +579,7 @@ const SessionEditor = () => {
     try {
       setIsUploading(true);
       setError(null);
-      const data = await uploadBeat(file);
+      const data = await uploadAudio(file);
       setBeatUrl(data.url);
       setBeatSource('upload');
     } catch (err) {
@@ -589,8 +591,50 @@ const SessionEditor = () => {
 
   const startRecording = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        } 
+      });
+      
+      // Build Web Audio pipeline
+      const audioContext = new window.AudioContext();
+      const micSource = audioContext.createMediaStreamSource(stream);
+      const gainNode = audioContext.createGain();
+      gainNode.gain.value = 2.5; // boost mic volume
+      const destination = audioContext.createMediaStreamDestination();
+      
+      // Mic pipeline: mic → gain → destination
+      micSource.connect(gainNode);
+      gainNode.connect(destination);
+
+      // --- Beat mixing (uploaded audio only, not YouTube) ---
+      let mixed = false;
+      if (
+        beatSource === 'upload' &&
+        beatPlayerRef.current instanceof HTMLAudioElement
+      ) {
+        try {
+          // createMediaElementSource can only be called ONCE per element — cache it
+          if (!beatAudioSourceRef.current) {
+            beatAudioSourceRef.current = audioContext.createMediaElementSource(beatPlayerRef.current);
+            // Also reconnect beat audio to speakers so user still hears it
+            beatAudioSourceRef.current.connect(audioContext.destination);
+          }
+          beatAudioSourceRef.current.connect(destination);
+          mixed = true;
+          console.log("🎛️ Beat mixed into recording");
+        } catch (err) {
+          console.warn("Beat capture not supported, fallback to mic only:", err);
+        }
+      }
+
+      setRecordingMode(mixed ? 'mic+beat' : 'mic-only');
+      console.log("Using processed stream:", destination.stream);
+
+      const mediaRecorder = new MediaRecorder(destination.stream);
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
 
@@ -603,6 +647,9 @@ const SessionEditor = () => {
       mediaRecorder.onstop = async () => {
         const fullBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
         
+        console.log("Recorded Blob Size:", fullBlob.size);
+        console.log("Recorded Blob Type:", fullBlob.type);
+
         // Temporarily put local URL while uploading
         const localUrl = URL.createObjectURL(fullBlob);
         const tempId = Date.now().toString();
@@ -610,21 +657,31 @@ const SessionEditor = () => {
         
         setTakes((prev) => [...prev, { _id: tempId, url: localUrl, name: defaultName, isUploading: true }]);
         
-        // Stop audio tracks
+        // Stop mic tracks so the browser recording indicator disappears
         stream.getTracks().forEach((track) => track.stop());
+        destination.stream.getTracks().forEach((track) => track.stop());
+        if (audioContext.state !== 'closed') {
+          audioContext.close();
+          // Clear the cached source so next recording creates a fresh one
+          beatAudioSourceRef.current = null;
+        }
 
         // Upload to Cloudinary
         try {
-          // Convert Blob to File object for the uploader
-          const file = new File([fullBlob], `${defaultName}.webm`, { type: 'audio/webm' });
-          const uploadedData = await uploadBeat(file);
+          const file = new File([fullBlob], `${defaultName.replace(/\s+/g, '_')}.webm`, { type: 'audio/webm' });
+          
+          console.log("FILE:", file);
+          console.log("TYPE:", file.type);
+          console.log("SIZE:", file.size);
+          
+          const uploadedData = await uploadAudio(file);
+          console.log("UPLOAD SUCCESS:", uploadedData);
           
           setTakes((prev) => prev.map(t => 
              t._id === tempId ? { _id: tempId, url: uploadedData.url, name: defaultName } : t
           ));
         } catch (err) {
-          console.error("Take upload failed:", err);
-          alert("Failed to upload take. It will not be saved permanently.");
+          console.error("UPLOAD ERROR:", err.response?.data || err);
           setTakes((prev) => prev.map(t => 
              t._id === tempId ? { ...t, isUploading: false, error: true } : t
           ));
@@ -634,7 +691,7 @@ const SessionEditor = () => {
       mediaRecorder.start();
       setIsRecording(true);
 
-      // Auto-play the beat player + loop when recording starts
+      // Auto-play beat when recording starts
       if (beatPlayerRef.current) {
         if (typeof beatPlayerRef.current.play === 'function') {
           beatPlayerRef.current.play();
@@ -644,6 +701,7 @@ const SessionEditor = () => {
         }
       }
     } catch (error) {
+      console.error("Recording error:", error);
       alert("Microphone access denied or not available.");
     }
   };
@@ -653,6 +711,7 @@ const SessionEditor = () => {
       mediaRecorderRef.current.stop();
     }
     setIsRecording(false);
+    setRecordingMode(null);
   };
 
   const handleRenameTakeSubmit = (id) => {
@@ -1191,6 +1250,16 @@ const SessionEditor = () => {
                         <span className="h-2 w-2 rounded-sm bg-current"></span>
                         Stop
                       </button>
+                      {isRecording && recordingMode && (
+                        <span className={`flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full ${
+                          recordingMode === 'mic+beat'
+                            ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400'
+                            : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-400'
+                        }`}>
+                          <span className="animate-pulse h-1.5 w-1.5 rounded-full bg-current"></span>
+                          {recordingMode === 'mic+beat' ? 'Mic + Beat' : 'Mic Only'}
+                        </span>
+                      )}
                     </div>
                     <select 
                       className="bg-gray-100 dark:bg-gray-800 text-sm p-2 rounded outline-none text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-700"
