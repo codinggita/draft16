@@ -12,7 +12,13 @@ const sessionSchema = new mongoose.Schema({
     label: { type: String, required: true }
   }],
   beatSource: { type: String, enum: ['upload', 'youtube', 'external'] },
-  beatUrl: { type: String }
+  beatUrl: { type: String },
+  bpm: { type: Number, default: 120 },
+  takes: [{
+    url: { type: String, required: true },
+    name: { type: String, required: true },
+    createdAt: { type: Date, default: Date.now }
+  }]
 }, {
   timestamps: true
 });
