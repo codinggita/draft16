@@ -23,8 +23,9 @@ exports.createSession = async (req, res) => {
     });
 
     res.status(201).json(session);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+  } catch (err) {
+    console.error("SESSION SAVE ERROR:", err);
+    res.status(500).json({ message: err.message });
   }
 };
 
@@ -82,12 +83,15 @@ exports.updateSession = async (req, res) => {
     if (beatUrl !== undefined) session.beatUrl = beatUrl;
     if (markers !== undefined) session.markers = markers;
     if (bpm !== undefined) session.bpm = bpm;
-    if (takes !== undefined) session.takes = takes;
+    if (takes !== undefined) {
+      session.takes = Array.isArray(takes) ? takes : (takes ? [takes] : []);
+    }
 
     const updatedSession = await session.save();
     res.json(updatedSession);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+  } catch (err) {
+    console.error("SESSION SAVE ERROR:", err);
+    res.status(500).json({ message: err.message });
   }
 };
 
