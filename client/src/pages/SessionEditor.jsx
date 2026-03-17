@@ -4,6 +4,7 @@ import { getSessionById, updateSession } from '../services/sessionService';
 import { uploadBeat } from '../services/uploadService';
 import { getRhymes } from '../services/rhymeService';
 import BeatPlayer from '../components/BeatPlayer';
+import { startMetronome } from '../utils/metronome';
 import CodeMirror from '@uiw/react-codemirror';
 import { ViewPlugin, Decoration, EditorView, WidgetType, placeholder } from '@codemirror/view';
 import { RangeSetBuilder } from '@codemirror/state';
@@ -364,6 +365,13 @@ const SessionEditor = () => {
   const [activeDraftIndex, setActiveDraftIndex] = useState(0);
   const [beatSource, setBeatSource] = useState('youtube');
   const [beatUrl, setBeatUrl] = useState('');
+  const [bpm, setBpm] = useState(120);
+  const [metronomeOn, setMetronomeOn] = useState(false);
+  
+  const [isRecording, setIsRecording] = useState(false);
+  const [takes, setTakes] = useState([]);
+  const [editingTakeId, setEditingTakeId] = useState(null);
+  const [editingTakeName, setEditingTakeName] = useState('');
   
   const [markers, setMarkers] = useState([]);
   const [newMarkerTime, setNewMarkerTime] = useState('');
@@ -381,6 +389,10 @@ const SessionEditor = () => {
   const textareaRef = useRef(null);
   const beatPlayerRef = useRef(null);
   const editorRef = useRef(null);
+  const metronomeRef = useRef(null);
+  const clickAudioRef = useRef(typeof Audio !== 'undefined' ? new Audio('/metronome-click.wav') : null);
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
   
   const currentDraft = drafts[activeDraftIndex] || { content: '' };
   const lyrics = currentDraft.content;
@@ -484,6 +496,8 @@ const SessionEditor = () => {
 
         setBeatSource(data.beatSource || 'youtube');
         setBeatUrl(data.beatUrl || '');
+        setBpm(data.bpm || 120);
+        setTakes(data.takes || []);
         setMarkers(data.markers || []);
         setLoading(false);
       } catch (err) {
@@ -494,6 +508,30 @@ const SessionEditor = () => {
 
     fetchSession();
   }, [id]);
+
+  const playClick = () => {
+    if (clickAudioRef.current) {
+      clickAudioRef.current.currentTime = 0;
+      clickAudioRef.current.play().catch(e => console.warn("Audio play failed", e));
+    }
+  };
+
+  useEffect(() => {
+    if (metronomeOn) {
+      if (metronomeRef.current) clearInterval(metronomeRef.current);
+      metronomeRef.current = startMetronome(bpm, playClick);
+    } else {
+      if (metronomeRef.current) {
+        clearInterval(metronomeRef.current);
+        metronomeRef.current = null;
+      }
+    }
+    return () => {
+      if (metronomeRef.current) {
+        clearInterval(metronomeRef.current);
+      }
+    };
+  }, [metronomeOn, bpm]);
 
   // Auto-save: debounce 3s after user stops typing
   useEffect(() => {
@@ -506,12 +544,12 @@ const SessionEditor = () => {
     }, 3000);
 
     return () => clearTimeout(autoSaveTimer.current);
-  }, [drafts, title, beatSource, beatUrl, markers]);
+  }, [drafts, title, beatSource, beatUrl, markers, bpm, takes]);
 
   const autoSaveSession = async () => {
     try {
       setIsSaving(true);
-      await updateSession(id, { title, drafts, beatSource, beatUrl, markers });
+      await updateSession(id, { title, drafts, beatSource, beatUrl, markers, bpm, takes });
       setIsSaving(false);
       setLastSaved(true);
     } catch {
@@ -523,7 +561,7 @@ const SessionEditor = () => {
     try {
       setSaving(true);
       clearTimeout(autoSaveTimer.current);
-      await updateSession(id, { title, drafts, beatSource, beatUrl, markers });
+      await updateSession(id, { title, drafts, beatSource, beatUrl, markers, bpm, takes });
       setSaving(false);
       setLastSaved(true);
     } catch (err) {
@@ -546,6 +584,99 @@ const SessionEditor = () => {
       setError(err.response?.data?.message || 'Error uploading file');
     } finally {
       setIsUploading(false);
+    }
+  };
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = async () => {
+        const fullBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        
+        // Temporarily put local URL while uploading
+        const localUrl = URL.createObjectURL(fullBlob);
+        const tempId = Date.now().toString();
+        const defaultName = `Take ${takes.length + 1}`;
+        
+        setTakes((prev) => [...prev, { _id: tempId, url: localUrl, name: defaultName, isUploading: true }]);
+        
+        // Stop audio tracks
+        stream.getTracks().forEach((track) => track.stop());
+
+        // Upload to Cloudinary
+        try {
+          // Convert Blob to File object for the uploader
+          const file = new File([fullBlob], `${defaultName}.webm`, { type: 'audio/webm' });
+          const uploadedData = await uploadBeat(file);
+          
+          setTakes((prev) => prev.map(t => 
+             t._id === tempId ? { _id: tempId, url: uploadedData.url, name: defaultName } : t
+          ));
+        } catch (err) {
+          console.error("Take upload failed:", err);
+          alert("Failed to upload take. It will not be saved permanently.");
+          setTakes((prev) => prev.map(t => 
+             t._id === tempId ? { ...t, isUploading: false, error: true } : t
+          ));
+        }
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+
+      // Auto-play the beat player + loop when recording starts
+      if (beatPlayerRef.current) {
+        if (typeof beatPlayerRef.current.play === 'function') {
+          beatPlayerRef.current.play();
+        } else if (typeof beatPlayerRef.current.seekTo === 'function') {
+          const currentTime = typeof beatPlayerRef.current.getCurrentTime === 'function' ? beatPlayerRef.current.getCurrentTime() : 0;
+          beatPlayerRef.current.seekTo(currentTime);
+        }
+      }
+    } catch (error) {
+      alert("Microphone access denied or not available.");
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
+    setIsRecording(false);
+  };
+
+  const handleRenameTakeSubmit = (id) => {
+    if (editingTakeName.trim()) {
+      setTakes(prev => prev.map(t => t._id === id || t.id === id ? { ...t, name: editingTakeName.trim() } : t));
+    }
+    setEditingTakeId(null);
+  };
+  
+  const handlePlayTakeSync = (takeId) => {
+    // 1. Play the beat player
+    if (beatPlayerRef.current) {
+      if (typeof beatPlayerRef.current.seekTo === 'function') {
+        beatPlayerRef.current.seekTo(0);
+      } else if (beatPlayerRef.current.currentTime !== undefined) {
+        beatPlayerRef.current.currentTime = 0;
+        beatPlayerRef.current.play();
+      }
+    }
+    // 2. Play the specific audio element
+    const audios = document.querySelectorAll(`audio[data-take-id="${takeId}"]`);
+    if (audios.length > 0) {
+      audios[0].currentTime = 0;
+      audios[0].play();
     }
   };
 
@@ -770,6 +901,43 @@ const SessionEditor = () => {
             {beatSource === 'upload' && beatUrl && (
               <audio ref={beatPlayerRef} controls src={beatUrl} className="w-full h-12 rounded-lg outline-none mt-2" />
             )}
+
+            <div className="flex items-center justify-start gap-4 mt-2">
+              <div className="flex items-center gap-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 px-3 py-1.5 rounded-lg shadow-sm">
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">BPM</label>
+                <input 
+                  type="number"
+                  value={bpm}
+                  min="40"
+                  max="220"
+                  onChange={(e) => setBpm(Number(e.target.value))}
+                  className="w-16 p-1 text-center bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-gray-900 dark:text-white outline-none focus:ring-1 focus:ring-blue-500 font-mono text-sm"
+                />
+              </div>
+              <button
+                onClick={() => setMetronomeOn(!metronomeOn)}
+                className={`flex items-center gap-2 px-4 py-1.5 text-sm font-medium rounded-lg shadow-sm transition-colors border ${
+                  metronomeOn 
+                    ? 'bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800' 
+                    : 'bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800'
+                }`}
+              >
+                {metronomeOn ? (
+                  <>
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+                    </span>
+                    Metronome ON
+                  </>
+                ) : (
+                  <>
+                    <span className="h-2 w-2 rounded-full bg-gray-300 dark:bg-gray-600"></span>
+                    Metronome OFF
+                  </>
+                )}
+              </button>
+            </div>
 
           </div>
 
@@ -998,6 +1166,32 @@ const SessionEditor = () => {
                     </span>
                   </label>
                   <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2 mr-2">
+                      <button
+                        onClick={startRecording}
+                        disabled={isRecording}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-sm font-medium transition-colors ${
+                          isRecording 
+                            ? 'bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-500 cursor-not-allowed' 
+                            : 'bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800/50 dark:hover:bg-red-900/50'
+                        }`}
+                      >
+                        <span className={`h-2 w-2 rounded-full ${isRecording ? 'bg-gray-400 dark:bg-gray-500' : 'bg-red-500'}`}></span>
+                        Record
+                      </button>
+                      <button
+                        onClick={stopRecording}
+                        disabled={!isRecording}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-sm font-medium transition-colors ${
+                          !isRecording 
+                            ? 'bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-500 cursor-not-allowed' 
+                            : 'bg-gray-800 text-white hover:bg-gray-900 dark:bg-gray-200 dark:text-gray-900 dark:hover:bg-white'
+                        }`}
+                      >
+                        <span className="h-2 w-2 rounded-sm bg-current"></span>
+                        Stop
+                      </button>
+                    </div>
                     <select 
                       className="bg-gray-100 dark:bg-gray-800 text-sm p-2 rounded outline-none text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-700"
                       onChange={(e) => {
@@ -1107,6 +1301,73 @@ const SessionEditor = () => {
                     className={`relative z-10 w-full font-mono leading-relaxed text-gray-900 dark:text-white transition-colors`}
                   />
                 </div>
+                
+                {/* Audio Takes Display */}
+                {takes.length > 0 && (
+                  <div className="mt-6 border-t border-gray-200 dark:border-gray-700 pt-4">
+                    <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
+                      <span className="text-xl">🎤</span> Takes ({takes.length})
+                    </h3>
+                    <div className="space-y-3">
+                      {takes.map((take, index) => {
+                        const takeIdentifier = take._id || take.id;
+                        return (
+                        <div key={takeIdentifier} className="flex items-center gap-4 bg-gray-50 dark:bg-gray-800/80 p-3 rounded-lg border border-gray-100 dark:border-gray-700">
+                          {editingTakeId === takeIdentifier ? (
+                            <input
+                              autoFocus
+                              type="text"
+                              value={editingTakeName}
+                              onChange={(e) => setEditingTakeName(e.target.value)}
+                              onBlur={() => handleRenameTakeSubmit(takeIdentifier)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') handleRenameTakeSubmit(takeIdentifier);
+                                if (e.key === 'Escape') setEditingTakeId(null);
+                              }}
+                              className="text-sm font-semibold bg-white dark:bg-gray-900 border border-blue-500 rounded px-2 py-1 outline-none min-w-[100px]"
+                            />
+                          ) : (
+                            <span 
+                              className="text-sm font-semibold text-gray-600 dark:text-gray-400 min-w-[100px] cursor-text hover:text-blue-500 transition-colors"
+                              onDoubleClick={() => {
+                                setEditingTakeId(takeIdentifier);
+                                setEditingTakeName(take.name || `Take ${index + 1}`);
+                              }}
+                              title="Double click to rename"
+                            >
+                              {take.name || `Take ${index + 1}`}
+                            </span>
+                          )}
+                          
+                          <button
+                            onClick={() => handlePlayTakeSync(takeIdentifier)}
+                            className="bg-blue-100 text-blue-600 hover:bg-blue-200 dark:bg-blue-900/40 dark:text-blue-400 dark:hover:bg-blue-900/60 rounded-full w-8 h-8 flex items-center justify-center transition-colors shadow-sm"
+                            title="Play synced with beat"
+                          >
+                            ▶
+                          </button>
+                          
+                          <audio data-take-id={takeIdentifier} controls src={take.url} className="h-8 flex-1 outline-none" />
+                          
+                          {take.isUploading && (
+                             <span className="text-xs text-blue-500 animate-pulse">Uploading...</span>
+                          )}
+                          {take.error && (
+                             <span className="text-xs text-red-500">Upload failed</span>
+                          )}
+                          
+                          <button
+                            onClick={() => setTakes(takes.filter(t => t._id !== takeIdentifier && t.id !== takeIdentifier))}
+                            className="text-gray-400 hover:text-red-500 transition-colors p-1 ml-2"
+                            title="Delete take"
+                          >
+                            &times;
+                          </button>
+                        </div>
+                      )})}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
             
