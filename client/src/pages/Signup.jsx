@@ -28,48 +28,57 @@ const Signup = () => {
   };
 
   return (
-    <div className="relative flex justify-center items-center min-h-[calc(100vh-73px)] overflow-hidden p-6">
-      {/* Background Orbs */}
-      <div className="absolute top-1/4 -right-12 w-72 h-72 bg-purple-500/20 rounded-full blur-3xl pointer-events-none -z-10" />
-      <div className="absolute bottom-1/4 -left-12 w-72 h-72 bg-cyan-500/20 rounded-full blur-3xl pointer-events-none -z-10" />
-
-      <div className="glass-panel p-8 sm:p-10 rounded-2xl shadow-2xl w-full max-w-md z-10">
-        <h2 className="font-display text-3xl font-bold text-slate-900 dark:text-white text-center mb-8 tracking-tight">Create Account</h2>
+    <div className="flex justify-center items-center min-h-[calc(100vh-73px)] p-6" style={{ background: 'var(--bg-base)' }}>
+      <div className="w-full max-w-md" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: '12px', padding: '32px' }}>
+        <h2 className="font-display text-3xl font-bold text-center mb-8 tracking-tight" style={{ color: 'var(--text-main)' }}>Create Account</h2>
         
-        {error && <div className="bg-red-50/80 dark:bg-red-900/40 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-300 p-3 rounded-xl mb-6 text-sm text-center backdrop-blur-sm">{error}</div>}
+        {error && (
+          <div className="p-3 rounded-lg mb-6 text-sm text-center" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444' }}>
+            {error}
+          </div>
+        )}
         
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Username</label>
+            <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-muted)' }}>Username</label>
             <input
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              className="w-full p-3 border border-slate-200 dark:border-white/10 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none bg-white/50 dark:bg-slate-900/50 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 transition-all backdrop-blur-sm shadow-inner"
+              className="w-full p-3 rounded-lg outline-none transition-all"
+              style={{ background: 'var(--bg-base)', border: '1px solid var(--border-subtle)', color: 'var(--text-main)' }}
+              onFocus={(e) => e.target.style.borderColor = 'var(--accent-focus)'}
+              onBlur={(e) => e.target.style.borderColor = 'var(--border-subtle)'}
               placeholder="Choose a username"
               required
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Email</label>
+            <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-muted)' }}>Email</label>
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full p-3 border border-slate-200 dark:border-white/10 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none bg-white/50 dark:bg-slate-900/50 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 transition-all backdrop-blur-sm shadow-inner"
+              className="w-full p-3 rounded-lg outline-none transition-all"
+              style={{ background: 'var(--bg-base)', border: '1px solid var(--border-subtle)', color: 'var(--text-main)' }}
+              onFocus={(e) => e.target.style.borderColor = 'var(--accent-focus)'}
+              onBlur={(e) => e.target.style.borderColor = 'var(--border-subtle)'}
               placeholder="Enter your email"
               required
             />
           </div>
           
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Password</label>
+            <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-muted)' }}>Password</label>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full p-3 border border-slate-200 dark:border-white/10 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none bg-white/50 dark:bg-slate-900/50 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 transition-all backdrop-blur-sm shadow-inner"
+              className="w-full p-3 rounded-lg outline-none transition-all"
+              style={{ background: 'var(--bg-base)', border: '1px solid var(--border-subtle)', color: 'var(--text-main)' }}
+              onFocus={(e) => e.target.style.borderColor = 'var(--accent-focus)'}
+              onBlur={(e) => e.target.style.borderColor = 'var(--border-subtle)'}
               placeholder="Create a password"
               required
             />
@@ -78,14 +87,18 @@ const Signup = () => {
           <button
             type="submit"
             disabled={loading}
-            className={`w-full py-3.5 mt-2 rounded-xl font-medium text-white shadow-lg transition-all duration-300 ${loading ? 'bg-indigo-400 cursor-not-allowed' : 'bg-linear-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 hover:shadow-indigo-500/25 hover:-translate-y-0.5'}`}
+            className="w-full py-3 mt-2 rounded-lg font-medium text-white transition-all"
+            style={{ background: loading ? '#818cf8' : 'var(--accent-focus)', cursor: loading ? 'not-allowed' : 'pointer' }}
           >
-            {loading ? 'Creating...' : 'Sign Up'}
+            {loading ? 'Creating account...' : 'Sign Up'}
           </button>
         </form>
         
-        <p className="text-center text-slate-600 dark:text-slate-400 text-sm mt-8">
-          Already have an account? <Link to="/login" className="font-semibold text-indigo-600 dark:text-cyan-400 hover:underline transition-colors">Log in</Link>
+        <p className="text-center text-sm mt-8" style={{ color: 'var(--text-muted)' }}>
+          Already have an account?{' '}
+          <Link to="/login" className="font-semibold hover:underline" style={{ color: 'var(--accent-focus)' }}>
+            Log in
+          </Link>
         </p>
       </div>
     </div>
