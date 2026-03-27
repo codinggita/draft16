@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import { getSessionById, updateSession } from '../services/sessionService';
 import { uploadAudio } from '../services/uploadService';
 import { getRhymes } from '../services/rhymeService';
 import BeatPlayer from '../components/BeatPlayer';
+import YouTubePlayer from '../components/YouTubePlayer';
 import { startMetronome } from '../utils/metronome';
 import CodeMirror from '@uiw/react-codemirror';
 import { ViewPlugin, Decoration, EditorView, WidgetType, placeholder } from '@codemirror/view';
@@ -300,8 +302,6 @@ const SortableTab = ({ draft, idx, id, activeDraftIndex, setActiveDraftIndex, on
   };
 
   return (
-    // {...listeners} is on the whole div, but PointerSensor requires 8px movement
-    // to activate a drag — so plain clicks reach onClick without interference.
     <div
       ref={setNodeRef}
       style={style}
@@ -309,10 +309,10 @@ const SortableTab = ({ draft, idx, id, activeDraftIndex, setActiveDraftIndex, on
       {...listeners}
       onClick={() => setActiveDraftIndex(idx)}
       onDoubleClick={handleDoubleClick}
-      className={`group flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors cursor-grab active:cursor-grabbing border select-none relative shrink-0
+      className={`group flex items-center gap-2 px-5 py-2.5 text-sm font-bold transition-all cursor-grab active:cursor-grabbing border select-none relative shrink-0 tracking-wide
         ${isActive 
-          ? 'bg-white dark:bg-gray-900 border-t-gray-200 border-l-gray-200 border-r-gray-200 border-b-white dark:border-t-gray-700 dark:border-l-gray-700 dark:border-r-gray-700 dark:border-b-gray-900 rounded-t-lg text-blue-600 dark:text-blue-400 -mb-px z-10' 
-          : 'bg-gray-100 dark:bg-gray-800 border-transparent border-b-transparent text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-t-lg z-0 mb-0'
+          ? 'bg-white dark:bg-slate-900 border-slate-200/50 dark:border-white/10 border-b-white dark:border-b-slate-900 rounded-t-2xl text-indigo-600 dark:text-cyan-400 -mb-px z-10 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]' 
+          : 'bg-white/40 dark:bg-slate-800/40 border-transparent border-b-transparent text-slate-500 dark:text-slate-400 hover:bg-white/80 dark:hover:bg-slate-800/80 rounded-t-xl z-0 mb-0'
         }`}
     >
       {isEditing ? (
@@ -322,7 +322,7 @@ const SortableTab = ({ draft, idx, id, activeDraftIndex, setActiveDraftIndex, on
           onChange={(e) => setEditName(e.target.value)}
           onKeyDown={handleKeyDown}
           onBlur={handleBlur}
-          className="bg-transparent border-b border-blue-500 outline-none min-w-[60px] max-w-[120px] px-1"
+          className="bg-transparent border-b-2 border-indigo-500 text-slate-900 dark:text-white outline-none min-w-[60px] max-w-[120px] px-1"
           onPointerDown={(e) => e.stopPropagation()} 
         />
       ) : (
@@ -338,7 +338,7 @@ const SortableTab = ({ draft, idx, id, activeDraftIndex, setActiveDraftIndex, on
             e.stopPropagation();
             onDelete(idx);
           }}
-          className="text-gray-400 hover:text-red-500 ml-1 opacity-0 group-hover:opacity-100 transition-opacity focus:outline-none"
+          className="text-slate-400 hover:text-red-500 hover:bg-red-500/10 h-5 w-5 flex items-center justify-center rounded-full ml-1 opacity-0 group-hover:opacity-100 transition-all focus:outline-none"
         >
           &times;
         </button>
@@ -546,12 +546,12 @@ const SessionEditor = () => {
     }, 3000);
 
     return () => clearTimeout(autoSaveTimer.current);
-  }, [drafts, title, beatSource, beatUrl, markers, bpm, takes]);
+  }, [drafts, title, beatSource, beatUrl, markers, bpm]);
 
   const autoSaveSession = async () => {
     try {
       setIsSaving(true);
-      await updateSession(id, { title, drafts, beatSource, beatUrl, markers, bpm, takes });
+      await updateSession(id, { title, drafts, beatSource, beatUrl, markers, bpm });
       setIsSaving(false);
       setLastSaved(true);
     } catch {
@@ -572,21 +572,18 @@ const SessionEditor = () => {
     }
   };
 
-  const handleFileUpload = async (e) => {
+  const handleFileUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
-    try {
-      setIsUploading(true);
-      setError(null);
-      const data = await uploadAudio(file);
-      setBeatUrl(data.url);
-      setBeatSource('upload');
-    } catch (err) {
-      setError(err.response?.data?.message || 'Error uploading file');
-    } finally {
-      setIsUploading(false);
+    // Revoke previous object URL to free memory
+    if (beatUrl && beatSource === 'upload' && beatUrl.startsWith('blob:')) {
+      URL.revokeObjectURL(beatUrl);
     }
+
+    const localUrl = URL.createObjectURL(file);
+    setBeatUrl(localUrl);
+    setBeatSource('upload');
   };
 
   const startRecording = async () => {
@@ -655,7 +652,8 @@ const SessionEditor = () => {
         const tempId = Date.now().toString();
         const defaultName = `Take ${takes.length + 1}`;
         
-        setTakes((prev) => [...prev, { _id: tempId, url: localUrl, name: defaultName, isUploading: true }]);
+        // Add a temporary take to the UI with an uploading state
+        setTakes((prev) => [...(Array.isArray(prev) ? prev : []), { _id: tempId, url: localUrl, name: defaultName, isUploading: true }]);
         
         // Stop mic tracks so the browser recording indicator disappears
         stream.getTracks().forEach((track) => track.stop());
@@ -677,9 +675,28 @@ const SessionEditor = () => {
           const uploadedData = await uploadAudio(file);
           console.log("UPLOAD SUCCESS:", uploadedData);
           
-          setTakes((prev) => prev.map(t => 
-             t._id === tempId ? { _id: tempId, url: uploadedData.url, name: defaultName } : t
-          ));
+          // The final take to save — no _id so MongoDB generates a valid ObjectId
+          const finalTake = { url: uploadedData.url, name: defaultName };
+
+          // Safely build new takes list, replacing temp placeholder
+          const safeTakes = Array.isArray(takes) ? takes : [];
+          const newTakes = [...safeTakes.filter(t => t._id !== tempId), finalTake];
+
+          // 1. Update UI optimistically
+          setTakes(newTakes);
+
+          // 2. Persist to backend (uses the pre-configured api instance, not raw axios)
+          try {
+            const res = await updateSession(id, { takes: newTakes });
+
+            if (res?.takes && Array.isArray(res.takes)) {
+              setTakes(res.takes); // Sync with DB-generated ObjectIDs
+            } else {
+              console.warn("Invalid takes response from DB, keeping local takes");
+            }
+          } catch (err) {
+            console.error("SAVE ERROR:", err);
+          }
         } catch (err) {
           console.error("UPLOAD ERROR:", err.response?.data || err);
           setTakes((prev) => prev.map(t => 
@@ -861,36 +878,46 @@ const SessionEditor = () => {
     }
   };
 
-  if (loading) return <div className="p-8 text-center text-gray-500">Loading session...</div>;
-  if (error) return <div className="p-8 text-center text-red-500">{error}</div>;
+  if (loading) return (
+    <div className="min-h-[calc(100vh-73px)] flex justify-center items-center">
+       <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500"></div>
+    </div>
+  );
+  if (error) return (
+    <div className="min-h-[calc(100vh-73px)] flex justify-center items-center text-red-500 font-medium">{error}</div>
+  );
 
   // Mark first load complete after initial data is populated
   if (!loading && isFirstLoad.current) isFirstLoad.current = false;
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors p-6 md:p-10">
-      <div className="max-w-6xl mx-auto space-y-6">
+    <div className="relative min-h-[calc(100vh-73px)] overflow-hidden p-4 md:p-8">
+      {/* Background Orbs */}
+      <div className="fixed top-0 right-1/4 w-[500px] h-[500px] bg-indigo-500/10 rounded-full blur-[120px] pointer-events-none -z-10" />
+      <div className="fixed bottom-0 left-1/4 w-[500px] h-[500px] bg-purple-500/10 rounded-full blur-[120px] pointer-events-none -z-10" />
+
+      <div className="max-w-[1500px] w-full mx-auto space-y-6 relative z-10">
         
         {/* Header Actions */}
-        <div className="flex justify-between items-center bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 transition-colors">
+        <div className="flex justify-between items-center glass-panel p-4 rounded-2xl shadow-sm border border-transparent dark:border-white/10 transition-colors mb-2">
           <button 
             onClick={() => navigate('/dashboard')}
-            className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 font-medium"
+            className="text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-cyan-400 font-semibold transition-colors flex items-center gap-2"
           >
-            &larr; Back to Dashboard
+            <span>&larr;</span> Dashboard
           </button>
           <div className="flex items-center gap-3">
             <button
               onClick={exportLyrics}
-              className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded transition-colors"
+              className="bg-white/50 dark:bg-white/5 hover:bg-white/80 dark:hover:bg-white/10 text-slate-700 dark:text-slate-200 px-4 py-2 rounded-xl transition-all border border-slate-200 dark:border-white/10 text-sm font-medium hidden sm:block shadow-sm"
             >
-              Export Lyrics
+              Export TXT
             </button>
             <button 
               onClick={handleSave}
               disabled={saving}
-              className={`px-6 py-2 rounded-lg font-medium text-white transition-colors
-                ${saving ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}
+              className={`px-6 py-2 rounded-xl font-bold text-white transition-all shadow-lg text-sm
+                ${saving ? 'bg-indigo-400 cursor-not-allowed' : 'bg-linear-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 hover:shadow-indigo-500/25 hover:-translate-y-0.5'}`}
             >
               {saving ? 'Saving...' : 'Save Session'}
             </button>
@@ -898,19 +925,19 @@ const SessionEditor = () => {
         </div>
 
         {/* Editor Main Content */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden transition-colors">
+        <div className="glass-panel rounded-3xl overflow-hidden transition-colors border border-transparent dark:border-white/10 shadow-2xl">
           
           {/* Top Controls (Title & Beat) */}
-          <div className="p-6 border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50 space-y-4 transition-colors">
+          <div className="p-6 md:p-8 border-b border-slate-200/50 dark:border-white/5 bg-white/20 dark:bg-slate-800/10 space-y-6 transition-colors">
             
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Session Title</label>
+              <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Session Title</label>
               <input
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="Name your track..."
-                className="w-full text-2xl font-bold p-3 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white dark:bg-gray-900 text-gray-900 dark:text-white transition-all"
+                className="w-full text-3xl md:text-4xl font-display font-extrabold p-0 bg-transparent outline-none text-slate-900 dark:text-white placeholder-slate-300 dark:placeholder-slate-600 transition-all border-none focus:ring-0"
               />
             </div>
 
@@ -923,7 +950,7 @@ const SessionEditor = () => {
                   className="w-full p-3 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white dark:bg-gray-900 text-gray-900 dark:text-white transition-colors"
                 >
                   <option value="youtube">YouTube</option>
-                  <option value="upload">Upload (Coming Soon)</option>
+                  <option value="upload">Upload Audio</option>
                   <option value="external">External Link</option>
                 </select>
               </div>
@@ -931,13 +958,12 @@ const SessionEditor = () => {
                 {beatSource === 'upload' ? (
                   <>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      {isUploading ? 'Uploading...' : 'Upload Beat (MP3/WAV)'}
+                      Upload Beat
                     </label>
                     <input
                       type="file"
-                      accept=".mp3,.wav"
+                      accept="audio/*"
                       onChange={handleFileUpload}
-                      disabled={isUploading}
                       className="w-full p-2 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white dark:bg-gray-900 text-gray-900 dark:text-white transition-colors file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 dark:file:bg-gray-800 dark:file:text-blue-400"
                     />
                   </>
@@ -956,9 +982,14 @@ const SessionEditor = () => {
               </div>
             </div>
 
-            {beatSource === 'youtube' && <BeatPlayer ref={beatPlayerRef} beatSource={beatSource} beatUrl={beatUrl} />}
-            {beatSource === 'upload' && beatUrl && (
-              <audio ref={beatPlayerRef} controls src={beatUrl} className="w-full h-12 rounded-lg outline-none mt-2" />
+            {/* Audio file sources → HTMLAudioElement via BeatPlayer */}
+            {(beatSource === 'upload' || beatSource === 'external') && beatUrl && (
+              <BeatPlayer ref={beatPlayerRef} beatUrl={beatUrl} beatSource={beatSource} />
+            )}
+
+            {/* YouTube sources → iframe embed, never HTMLAudioElement */}
+            {beatSource === 'youtube' && beatUrl && (
+              <YouTubePlayer url={beatUrl} />
             )}
 
             <div className="flex items-center justify-start gap-4 mt-2">
@@ -1001,22 +1032,22 @@ const SessionEditor = () => {
           </div>
 
           {/* Lyrics Editor (Workspace) */}
-          <div className="p-6 flex flex-col md:grid md:grid-cols-[220px_1fr] gap-6">
+          <div className="p-6 md:p-8 flex flex-col lg:grid lg:grid-cols-[260px_1fr] gap-8 relative">
             
             {/* Section Navigator (Left Column on Desktop, Top on Mobile) */}
-            <div className="md:border-r border-gray-100 dark:border-gray-700 md:pr-4 flex flex-col gap-2">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Navigator</label>
+            <div className="lg:border-r border-slate-200/50 dark:border-white/5 lg:pr-6 flex flex-col gap-3">
+              <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Navigator</label>
               
-              <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1 mt-2">Sections</div>
-              <div className="overflow-y-auto space-y-1 mb-4 max-h-40">
+              <div className="text-[10px] font-bold text-indigo-500 dark:text-cyan-400 uppercase tracking-widest mb-1 mt-2">Sections</div>
+              <div className="overflow-y-auto space-y-1.5 mb-6 max-h-48 custom-scrollbar">
                 {parsedSections.map(section => (
                   <button
                     key={section.id}
                     onClick={() => navigateToSection(section.type)}
-                    className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    className={`w-full text-left px-4 py-2.5 rounded-xl text-sm font-semibold transition-all border ${
                       activeSectionId === section.id 
-                        ? 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white' 
-                        : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+                        ? 'bg-indigo-500/10 dark:bg-cyan-400/10 text-indigo-700 dark:text-cyan-300 border-indigo-500/20 dark:border-cyan-400/20 shadow-inner' 
+                        : 'bg-white/40 dark:bg-slate-900/40 text-slate-600 dark:text-slate-300 border-transparent hover:bg-white/80 dark:hover:bg-white/10 hover:border-slate-200/50 dark:hover:border-white/5'
                     }`}
                   >
                     {section.type}
@@ -1027,14 +1058,14 @@ const SessionEditor = () => {
                 )}
               </div>
 
-              <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1 mt-2">Beat Markers</div>
-              <div className="overflow-y-auto space-y-1 mb-2 max-h-40">
+              <div className="text-[10px] font-bold text-purple-500 dark:text-purple-400 uppercase tracking-widest mb-1 mt-2">Beat Markers</div>
+              <div className="overflow-y-auto space-y-1.5 mb-3 max-h-48 custom-scrollbar">
                 {markers.map((marker, index) => (
                   <div
                     key={index}
-                    className="group flex justify-between items-center w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
+                    className="group flex justify-between items-center w-full text-left px-4 py-2.5 rounded-xl text-sm font-semibold transition-all bg-white/40 dark:bg-slate-900/40 border border-transparent hover:bg-white/80 dark:hover:bg-white/10 hover:border-slate-200/50 dark:hover:border-white/5"
                   >
-                    <span className="cursor-pointer text-gray-600 dark:text-gray-400" onClick={() => navigateToSection(marker.label, marker.time)}>
+                    <span className="cursor-pointer text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-cyan-300 transition-colors" onClick={() => navigateToSection(marker.label, marker.time)}>
                       <span className="text-blue-500 mr-2">[{formatTime(marker.time)}]</span>
                       {marker.label}
                     </span>
@@ -1069,33 +1100,36 @@ const SessionEditor = () => {
                 )}
               </div>
               
-              <form onSubmit={handleAddMarker} className="flex gap-2 items-center text-sm px-1 mb-4">
-                <input 
-                  type="text" 
-                  value={newMarkerTime}
-                  onChange={(e) => setNewMarkerTime(e.target.value)}
-                  placeholder="0:00" 
-                  className="w-16 p-1 border border-gray-200 dark:border-gray-700 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white outline-none focus:ring-1 focus:ring-blue-500"
-                />
-                <input 
-                  type="text" 
-                  value={newMarkerLabel}
-                  onChange={(e) => setNewMarkerLabel(e.target.value)}
-                  placeholder="Label" 
-                  className="flex-1 p-1 border border-gray-200 dark:border-gray-700 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white outline-none focus:ring-1 focus:ring-blue-500 min-w-0"
-                />
-                <button type="submit" className="bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-400 px-2 py-1 rounded hover:bg-blue-200 dark:hover:bg-blue-800/80 transition-colors">
-                  +
-                </button>
+              <form onSubmit={handleAddMarker} className="flex gap-2 items-center text-sm mb-6">
+                <div className="flex bg-white/50 dark:bg-slate-900/50 border border-slate-200/50 dark:border-white/10 rounded-xl p-1 shadow-inner w-full flex-1">
+                  <input 
+                    type="text" 
+                    value={newMarkerTime}
+                    onChange={(e) => setNewMarkerTime(e.target.value)}
+                    placeholder="0:00" 
+                    className="w-16 p-1.5 text-center bg-transparent text-slate-900 dark:text-white outline-none focus:ring-0 font-mono text-xs placeholder-slate-400 border-none"
+                  />
+                  <div className="w-px bg-slate-200 dark:bg-white/10 mx-1"></div>
+                  <input 
+                    type="text" 
+                    value={newMarkerLabel}
+                    onChange={(e) => setNewMarkerLabel(e.target.value)}
+                    placeholder="Label" 
+                    className="flex-1 p-1.5 bg-transparent text-slate-900 dark:text-white outline-none focus:ring-0 min-w-0 text-xs placeholder-slate-400 border-none"
+                  />
+                  <button type="submit" className="bg-indigo-500 hover:bg-indigo-600 text-white px-3 py-1.5 rounded-lg transition-colors ml-1 shadow-sm font-bold">
+                    +
+                  </button>
+                </div>
               </form>
 
-              <div className="text-sm text-gray-500 pt-4 border-t border-gray-100 dark:border-gray-700">
-                <div className="mb-4 space-y-3">
-                  <div className="flex items-center justify-between px-1 border-b border-gray-100 dark:border-gray-700 pb-3">
-                    <span className="font-medium text-gray-700 dark:text-gray-300">Show Syllables</span>
+              <div className="text-sm pt-6 border-t border-slate-200/50 dark:border-white/5 space-y-4">
+                <div className="bg-white/40 dark:bg-slate-900/40 border border-slate-200/50 dark:border-white/5 rounded-2xl p-4 shadow-sm space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-slate-700 dark:text-slate-300 text-xs tracking-wide">Show Syllables</span>
                     <button 
                       onClick={() => setShowSyllables(!showSyllables)}
-                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${showSyllables ? 'bg-blue-500' : 'bg-gray-200 dark:bg-gray-700'}`}
+                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${showSyllables ? 'bg-indigo-500' : 'bg-slate-300 dark:bg-slate-600'}`}
                       role="switch"
                       aria-checked={showSyllables}
                     >
@@ -1103,11 +1137,11 @@ const SessionEditor = () => {
                     </button>
                   </div>
                   
-                  <div className="flex items-center justify-between px-1 border-b border-gray-100 dark:border-gray-700 pb-3">
-                    <span className="font-medium text-gray-700 dark:text-gray-300">Show Rhymes</span>
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-slate-700 dark:text-slate-300 text-xs tracking-wide">Show Rhymes</span>
                     <button 
                       onClick={() => setShowRhymes(!showRhymes)}
-                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${showRhymes ? 'bg-indigo-500' : 'bg-gray-200 dark:bg-gray-700'}`}
+                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${showRhymes ? 'bg-purple-500' : 'bg-slate-300 dark:bg-slate-600'}`}
                       role="switch"
                       aria-checked={showRhymes}
                     >
@@ -1115,32 +1149,32 @@ const SessionEditor = () => {
                     </button>
                   </div>
 
-                  <div className="flex items-center justify-between px-1">
-                    <span className="font-medium text-gray-700 dark:text-gray-300">Show Rhyme Scheme</span>
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-slate-700 dark:text-slate-300 text-xs tracking-wide">Rhyme Scheme</span>
                     <button 
                       onClick={() => setShowRhymeScheme(!showRhymeScheme)}
-                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${showRhymeScheme ? 'bg-teal-500' : 'bg-gray-200 dark:bg-gray-700'}`}
+                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${showRhymeScheme ? 'bg-teal-500' : 'bg-slate-300 dark:bg-slate-600'}`}
                       role="switch"
                       aria-checked={showRhymeScheme}
                     >
                       <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${showRhymeScheme ? 'translate-x-4' : 'translate-x-0'}`} />
                     </button>
                   </div>
-                  
-                  <button 
-                    onClick={handleFindRhymes}
-                    className="w-full bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 font-medium py-2 rounded border border-indigo-100 dark:border-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors"
-                  >
-                    Find Rhymes
-                  </button>
-                  
-                  {rhymeError && (
-                    <div className="text-xs text-red-500 mt-2">{rhymeError}</div>
-                  )}
                 </div>
+                  
+                <button 
+                  onClick={handleFindRhymes}
+                  className="w-full bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-cyan-300 font-bold py-2.5 rounded-xl border border-indigo-200 dark:border-indigo-500/20 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 transition-all shadow-sm tracking-wide text-xs uppercase"
+                >
+                  Find Rhymes
+                </button>
+                
+                {rhymeError && (
+                  <div className="text-xs text-red-500 font-medium px-2 mt-2">{rhymeError}</div>
+                )}
                 
                 {currentWord && !rhymeError && (
-                  <div className="mt-3 mb-4 space-y-2">
+                  <div className="mt-4 mb-4 space-y-2">
                     <div className="text-xs text-gray-400">Rhymes for: <span className="font-semibold text-gray-600 dark:text-gray-300">{currentWord}</span></div>
                     {isFetchingRhymes ? (
                       <div className="text-xs text-gray-400">Loading...</div>
@@ -1169,11 +1203,10 @@ const SessionEditor = () => {
             </div>
 
             {/* Existing Sections Workspace (Right Column) */}
-            {/* Removed overflow-hidden to stop clipping stacking contexts */}
-            <div className="flex flex-col bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
+            <div className="flex flex-col glass-panel rounded-3xl border border-transparent dark:border-white/10 shadow-2xl relative min-w-0">
               
               {/* Tabs UI */}
-              <div className="flex items-end overflow-x-auto whitespace-nowrap pt-2 px-2 bg-gray-100 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 min-h-[46px] relative z-20">
+              <div className="flex items-end overflow-x-auto whitespace-nowrap pt-3 px-4 bg-white/20 dark:bg-slate-800/40 border-b border-slate-200/50 dark:border-white/5 min-h-[56px] relative z-20 rounded-t-3xl custom-scrollbar-horizontal">
                 <DndContext collisionDetection={closestCenter} sensors={sensors} onDragEnd={handleDragEnd}>
                   <SortableContext items={drafts.map((draft, index) => index)} strategy={horizontalListSortingStrategy}>
                     {drafts.map((draft, idx) => (
@@ -1216,45 +1249,47 @@ const SessionEditor = () => {
                 </button>
               </div>
 
-              <div className="p-4 flex flex-col flex-1 h-full">
-                <div className="flex justify-between items-center mb-4">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Editor
-                    <span className="ml-4 font-normal text-xs text-gray-400 dark:text-gray-500">
-                      {isSaving ? '● Saving...' : lastSaved ? '✓ All changes saved' : ''}
+              <div className="p-0 flex flex-col flex-1 h-full relative border-t border-transparent">
+                <div className="flex justify-between items-center px-6 md:px-8 py-4 bg-white/10 dark:bg-slate-900/20 border-b border-slate-200/50 dark:border-white/5">
+                  <div className="flex flex-col">
+                    <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                      Workspace
+                    </label>
+                    <span className="text-[10px] font-semibold text-indigo-500 dark:text-cyan-400 h-4 mt-0.5">
+                      {isSaving ? '● Auto-saving...' : lastSaved ? '✓ Saved' : ''}
                     </span>
-                  </label>
+                  </div>
                   <div className="flex items-center gap-4">
                     <div className="flex items-center gap-2 mr-2">
                       <button
                         onClick={startRecording}
                         disabled={isRecording}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-sm font-medium transition-colors ${
+                        className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all shadow-sm ${
                           isRecording 
-                            ? 'bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-500 cursor-not-allowed' 
-                            : 'bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800/50 dark:hover:bg-red-900/50'
+                            ? 'bg-slate-100 text-slate-400 dark:bg-slate-800/50 dark:text-slate-600 cursor-not-allowed' 
+                            : 'bg-red-500/10 text-red-600 hover:bg-red-500 hover:text-white border border-red-500/20 dark:bg-red-500/20 dark:text-red-400 dark:border-red-500/30'
                         }`}
                       >
-                        <span className={`h-2 w-2 rounded-full ${isRecording ? 'bg-gray-400 dark:bg-gray-500' : 'bg-red-500'}`}></span>
-                        Record
+                        <span className={`h-2.5 w-2.5 rounded-full ${isRecording ? 'bg-slate-400 dark:bg-slate-600' : 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.8)] animate-pulse'}`}></span>
+                        Rec
                       </button>
                       <button
                         onClick={stopRecording}
                         disabled={!isRecording}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-sm font-medium transition-colors ${
+                        className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all shadow-sm border ${
                           !isRecording 
-                            ? 'bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-500 cursor-not-allowed' 
-                            : 'bg-gray-800 text-white hover:bg-gray-900 dark:bg-gray-200 dark:text-gray-900 dark:hover:bg-white'
+                            ? 'bg-slate-100 text-slate-400 border-transparent dark:bg-slate-800/50 dark:text-slate-600 cursor-not-allowed' 
+                            : 'bg-slate-800 text-white border-slate-700 hover:bg-slate-700 dark:bg-white dark:text-slate-900 dark:border-white hover:scale-105'
                         }`}
                       >
-                        <span className="h-2 w-2 rounded-sm bg-current"></span>
+                        <span className="h-2.5 w-2.5 rounded-sm bg-current"></span>
                         Stop
                       </button>
                       {isRecording && recordingMode && (
-                        <span className={`flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full ${
+                        <span className={`flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider px-3 py-1.5 rounded-full border ${
                           recordingMode === 'mic+beat'
-                            ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400'
-                            : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-400'
+                            ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:text-emerald-400'
+                            : 'bg-amber-500/10 text-amber-600 border-amber-500/20 dark:text-amber-400'
                         }`}>
                           <span className="animate-pulse h-1.5 w-1.5 rounded-full bg-current"></span>
                           {recordingMode === 'mic+beat' ? 'Mic + Beat' : 'Mic Only'}
@@ -1262,7 +1297,8 @@ const SessionEditor = () => {
                       )}
                     </div>
                     <select 
-                      className="bg-gray-100 dark:bg-gray-800 text-sm p-2 rounded outline-none text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-700"
+                      className="bg-white/50 dark:bg-slate-800/50 text-xs font-bold uppercase tracking-wider p-2.5 rounded-xl outline-none text-slate-700 dark:text-slate-200 border border-slate-200/50 dark:border-white/10 shadow-inner appearance-none pr-8 cursor-pointer"
+                      style={{ backgroundImage: `url('data:image/svg+xml;charset=US-ASCII,<svg xmlns="http://www.w3.org/2000/svg" width="292.4" height="292.4"><path fill="%239CA3AF" d="M287 69.4a17.6 17.6 0 0 0-13-5.4H18.4c-5 0-9.3 1.8-12.9 5.4A17.6 17.6 0 0 0 0 82.2c0 5 1.8 9.3 5.4 12.9l128 127.9c3.6 3.6 7.8 5.4 12.8 5.4s9.2-1.8 12.8-5.4L287 95c3.5-3.5 5.4-7.8 5.4-12.8 0-5-1.9-9.2-5.5-12.8z"/></svg>')`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 0.75rem top 50%', backgroundSize: '0.65rem auto' }}
                       onChange={(e) => {
                         if (e.target.value) {
                           insertSection(e.target.value);
@@ -1282,54 +1318,72 @@ const SessionEditor = () => {
                 </div>
                 <style>{`
                   .cm-section-header {
-                    color: #8b5cf6; /* Tailwind purple-500 */
-                    font-weight: 700;
-                    padding: 2px 4px;
-                    margin-left: -4px;
+                    color: #6366f1; /* Tailwind indigo-500 */
+                    font-weight: 800;
+                    font-family: 'Outfit', sans-serif;
+                    letter-spacing: 0.05em;
+                    text-transform: uppercase;
+                    padding: 4px 8px;
+                    margin-left: -8px;
                     transition: all 0.2s ease;
+                    display: inline-block;
+                    margin-top: 1rem;
+                    margin-bottom: 0.25rem;
                   }
                   .dark .cm-section-header {
-                    color: #a78bfa; /* Tailwind purple-400 */
+                    color: #22d3ee; /* Tailwind cyan-400 */
                   }
                   
                   .cm-active-section {
-                    background: rgba(59,130,246,0.15); /* Tailwind blue-500 with 15% opacity */
-                    border-radius: 4px;
+                    background: rgba(99,102,241,0.1); /* Tailwind indigo-500 with 10% */
+                    border-radius: 6px;
+                    border-left: 3px solid #6366f1;
                   }
                   .dark .cm-active-section {
-                    background: rgba(96,165,250,0.2); /* Tailwind blue-400 with 20% opacity */
+                    background: rgba(34,211,238,0.1); /* Tailwind cyan-400 with 10% */
+                    border-left: 3px solid #22d3ee;
                   }
                   
-                  .cm-syl-0 { color: #f87171 !important; } /* red-400 */
-                  .cm-syl-1 { color: #60a5fa !important; } /* blue-400 */
-                  .cm-syl-2 { color: #4ade80 !important; } /* green-400 */
-                  .cm-syl-3 { color: #facc15 !important; } /* yellow-400 */
-                  .cm-syl-4 { color: #c084fc !important; } /* purple-400 */
+                  .cm-syl-0 { color: #f87171 !important; }
+                  .cm-syl-1 { color: #818cf8 !important; }
+                  .cm-syl-2 { color: #34d399 !important; }
+                  .cm-syl-3 { color: #fbbf24 !important; }
+                  .cm-syl-4 { color: #c084fc !important; }
                   
-                  .cm-rhyme-0 { text-decoration: underline 2px #ef4444 !important; } /* red-500 */
-                  .cm-rhyme-1 { text-decoration: underline 2px #3b82f6 !important; } /* blue-500 */
-                  .cm-rhyme-2 { text-decoration: underline 2px #10b981 !important; } /* emerald-500 */
-                  .cm-rhyme-3 { text-decoration: underline 2px #eab308 !important; } /* yellow-500 */
+                  .cm-rhyme-0 { text-decoration: underline 2px #ef4444 !important; }
+                  .cm-rhyme-1 { text-decoration: underline 2px #6366f1 !important; }
+                  .cm-rhyme-2 { text-decoration: underline 2px #10b981 !important; }
+                  .cm-rhyme-3 { text-decoration: underline 2px #f59e0b !important; }
                   
                   .cm-rhyme-scheme {
                     font-size: 12px;
-                    color: #9ca3af;
+                    color: #6366f1;
                     margin-left: 8px;
-                    font-weight: 600;
+                    font-weight: 700;
+                    background: rgba(99,102,241,0.1);
+                    padding: 2px 6px;
+                    border-radius: 4px;
                   }
                   .dark .cm-rhyme-scheme {
-                    color: #6b7280;
+                    color: #22d3ee;
+                    background: rgba(34,211,238,0.1);
                   }
                   
                   .cm-editor {
                     height: 100%;
                     background-color: transparent;
                     font-family: inherit;
-                    font-size: 16px;
+                    font-size: 1.125rem;
+                    line-height: 1.75;
                   }
                   .cm-scroller {
                     overflow: auto;
                     height: 100%;
+                    /* Hide scrollbar for a cleaner look */
+                    scrollbar-width: none;
+                  }
+                  .cm-scroller::-webkit-scrollbar {
+                    display: none;
                   }
                   .cm-content {
                     padding: 1rem 0;
@@ -1345,7 +1399,7 @@ const SessionEditor = () => {
                     outline: none !important;
                   }
                 `}</style>
-                <div className="flex-1 w-full bg-gray-50 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-700 rounded-lg focus-within:ring-2 focus-within:ring-blue-500 transition-colors p-4" style={{ height: '600px', overflowY: 'auto' }}>
+                <div className="flex-1 w-full bg-white/40 dark:bg-slate-900/40 border border-slate-200/50 dark:border-white/5 rounded-2xl focus-within:ring-2 focus-within:ring-indigo-500/50 transition-colors p-6 md:p-8 shadow-inner" style={{ height: '600px', overflowY: 'auto' }}>
                   
                   <CodeMirror
                     onCreateEditor={(view) => {
@@ -1373,15 +1427,15 @@ const SessionEditor = () => {
                 
                 {/* Audio Takes Display */}
                 {takes.length > 0 && (
-                  <div className="mt-6 border-t border-gray-200 dark:border-gray-700 pt-4">
-                    <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
-                      <span className="text-xl">🎤</span> Takes ({takes.length})
+                  <div className="mt-6 border-t border-slate-200/50 dark:border-white/5 pt-6 px-6 pb-6">
+                    <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+                      <span className="text-lg">🎙️</span> Recorded Takes ({takes.length})
                     </h3>
                     <div className="space-y-3">
                       {takes.map((take, index) => {
                         const takeIdentifier = take._id || take.id;
                         return (
-                        <div key={takeIdentifier} className="flex items-center gap-4 bg-gray-50 dark:bg-gray-800/80 p-3 rounded-lg border border-gray-100 dark:border-gray-700">
+                        <div key={takeIdentifier} className="flex items-center gap-4 bg-white/50 dark:bg-slate-800/80 p-3 rounded-2xl border border-slate-200/50 dark:border-white/5 shadow-sm transition-all hover:shadow-md">
                           {editingTakeId === takeIdentifier ? (
                             <input
                               autoFocus
@@ -1393,11 +1447,11 @@ const SessionEditor = () => {
                                 if (e.key === 'Enter') handleRenameTakeSubmit(takeIdentifier);
                                 if (e.key === 'Escape') setEditingTakeId(null);
                               }}
-                              className="text-sm font-semibold bg-white dark:bg-gray-900 border border-blue-500 rounded px-2 py-1 outline-none min-w-[100px]"
+                              className="text-sm font-semibold bg-white dark:bg-slate-900 border border-indigo-500 rounded-lg px-3 py-1.5 outline-none min-w-[120px] shadow-inner"
                             />
                           ) : (
                             <span 
-                              className="text-sm font-semibold text-gray-600 dark:text-gray-400 min-w-[100px] cursor-text hover:text-blue-500 transition-colors"
+                              className="text-sm font-bold text-slate-700 dark:text-slate-200 min-w-[120px] cursor-text hover:text-indigo-600 dark:hover:text-cyan-400 transition-colors truncate"
                               onDoubleClick={() => {
                                 setEditingTakeId(takeIdentifier);
                                 setEditingTakeName(take.name || `Take ${index + 1}`);
@@ -1410,24 +1464,24 @@ const SessionEditor = () => {
                           
                           <button
                             onClick={() => handlePlayTakeSync(takeIdentifier)}
-                            className="bg-blue-100 text-blue-600 hover:bg-blue-200 dark:bg-blue-900/40 dark:text-blue-400 dark:hover:bg-blue-900/60 rounded-full w-8 h-8 flex items-center justify-center transition-colors shadow-sm"
+                            className="bg-indigo-100 text-indigo-600 hover:bg-indigo-200 dark:bg-indigo-500/20 dark:text-cyan-400 dark:hover:bg-indigo-500/30 rounded-xl w-10 h-10 flex items-center justify-center transition-all shadow-sm shrink-0"
                             title="Play synced with beat"
                           >
                             ▶
                           </button>
                           
-                          <audio data-take-id={takeIdentifier} controls src={take.url} className="h-8 flex-1 outline-none" />
+                          <audio data-take-id={takeIdentifier} controls src={take.url} className="h-10 flex-1 outline-none opacity-90 grayscale-[0.2]" />
                           
                           {take.isUploading && (
-                             <span className="text-xs text-blue-500 animate-pulse">Uploading...</span>
+                             <span className="text-xs font-bold text-indigo-500 uppercase tracking-widest animate-pulse px-2">Uploading...</span>
                           )}
                           {take.error && (
-                             <span className="text-xs text-red-500">Upload failed</span>
+                             <span className="text-xs font-bold text-red-500 uppercase tracking-widest px-2">Failed</span>
                           )}
                           
                           <button
                             onClick={() => setTakes(takes.filter(t => t._id !== takeIdentifier && t.id !== takeIdentifier))}
-                            className="text-gray-400 hover:text-red-500 transition-colors p-1 ml-2"
+                            className="text-slate-400 hover:bg-red-500 hover:text-white transition-colors h-8 w-8 rounded-full flex justify-center items-center font-bold pb-0.5 ml-2 shrink-0"
                             title="Delete take"
                           >
                             &times;

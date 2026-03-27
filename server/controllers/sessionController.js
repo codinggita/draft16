@@ -61,14 +61,13 @@ exports.getSessionById = async (req, res) => {
   }
 };
 
-// Update Session
 exports.updateSession = async (req, res) => {
   try {
-    const { title, drafts, beatSource, beatUrl, markers, bpm, takes } = req.body;
+    console.log("REQ BODY:", req.body);
     const session = await Session.findById(req.params.id);
 
     if (!session) {
-      return res.status(404).json({ message: 'Session not found' });
+      return res.status(404).json({ message: "Session not found" });
     }
 
     // Verify ownership
@@ -76,19 +75,19 @@ exports.updateSession = async (req, res) => {
       return res.status(403).json({ message: 'Forbidden' });
     }
 
-    // Update fields
-    if (title !== undefined) session.title = title;
-    if (drafts !== undefined) session.drafts = drafts;
-    if (beatSource !== undefined) session.beatSource = beatSource;
-    if (beatUrl !== undefined) session.beatUrl = beatUrl;
-    if (markers !== undefined) session.markers = markers;
-    if (bpm !== undefined) session.bpm = bpm;
-    if (takes !== undefined) {
-      session.takes = Array.isArray(takes) ? takes : (takes ? [takes] : []);
+    if (req.body.title !== undefined) session.title = req.body.title;
+    if (req.body.drafts !== undefined) session.drafts = req.body.drafts;
+    if (req.body.beatSource !== undefined) session.beatSource = req.body.beatSource;
+    if (req.body.beatUrl !== undefined) session.beatUrl = req.body.beatUrl;
+    if (req.body.markers !== undefined) session.markers = req.body.markers;
+    if (req.body.bpm !== undefined) session.bpm = req.body.bpm;
+    if (req.body.takes !== undefined) {
+      session.takes = req.body.takes;
     }
 
     const updatedSession = await session.save();
-    res.json(updatedSession);
+    console.log("SAVED SESSION takes:", updatedSession.takes);
+    return res.json(updatedSession);
   } catch (err) {
     console.error("SESSION SAVE ERROR:", err);
     res.status(500).json({ message: err.message });
