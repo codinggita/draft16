@@ -14,39 +14,71 @@ const Navbar = () => {
     navigate('/');
   };
 
-  const navLinkClass = (path) => 
-    `hover:text-indigo-600 dark:hover:text-cyan-400 font-medium transition-colors ${location.pathname === path ? 'text-indigo-600 dark:text-cyan-400' : ''}`;
+  const isActive = (path) => location.pathname === path;
 
   return (
-    <nav className="sticky top-0 z-50 glass-panel border-b border-gray-200 dark:border-white/10 text-slate-800 dark:text-slate-200 transition-all">
-      <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
-        <Link to="/" className="font-display font-bold text-2xl text-gradient tracking-tight hover:opacity-80 transition-opacity">
+    <nav style={{
+      position: 'sticky',
+      top: 0,
+      zIndex: 1000,
+      background: 'var(--bg-base)',
+      borderBottom: '1px solid var(--border-subtle)',
+      color: 'var(--text-main)',
+    }}>
+      <div className="max-w-6xl mx-auto px-6 py-4 flex justify-between items-center">
+        <Link
+          to="/"
+          className="font-display font-bold text-xl tracking-tight transition-opacity hover:opacity-75"
+          style={{ color: 'var(--text-main)' }}
+        >
           Draft16
         </Link>
         
         <div className="flex gap-6 items-center">
           {isAuthenticated ? (
             <>
-              <Link to="/dashboard" className={navLinkClass('/dashboard')}>Dashboard</Link>
-              <button 
-                onClick={handleLogout} 
-                className="hover:text-indigo-600 dark:hover:text-cyan-400 font-medium transition-colors"
+              <Link
+                to="/dashboard"
+                className="text-sm font-medium transition-colors"
+                style={{ color: isActive('/dashboard') ? 'var(--accent-focus)' : 'var(--text-muted)' }}
+              >
+                Dashboard
+              </Link>
+              <button
+                onClick={handleLogout}
+                className="text-sm font-medium transition-colors"
+                style={{ color: 'var(--text-muted)' }}
+                onMouseEnter={(e) => e.currentTarget.style.color = 'var(--text-main)'}
+                onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-muted)'}
               >
                 Logout
               </button>
             </>
           ) : (
             <>
-              <Link to="/login" className={navLinkClass('/login')}>Log in</Link>
-              <Link to="/signup" className="bg-linear-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white px-5 py-2 rounded-full shadow-md shadow-indigo-500/20 hover:shadow-indigo-500/40 hover:-translate-y-0.5 transition-all font-medium text-sm">
+              <Link
+                to="/login"
+                className="text-sm font-medium transition-colors"
+                style={{ color: isActive('/login') ? 'var(--accent-focus)' : 'var(--text-muted)' }}
+              >
+                Log in
+              </Link>
+              <Link
+                to="/signup"
+                className="text-sm font-medium text-white px-4 py-2 rounded-lg transition-opacity"
+                style={{ background: 'var(--accent-focus)' }}
+                onMouseEnter={(e) => e.currentTarget.style.opacity = '0.85'}
+                onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
+              >
                 Get Started
               </Link>
             </>
           )}
 
-          <button 
+          <button
             onClick={toggleTheme}
-            className="p-2 rounded-full bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 transition-colors border border-transparent dark:border-white/5 flex items-center justify-center leading-none"
+            className="p-1.5 rounded-md transition-colors text-sm leading-none flex items-center justify-center"
+            style={{ border: '1px solid var(--border-subtle)', color: 'var(--text-muted)', background: 'transparent' }}
             aria-label="Toggle theme"
           >
             {theme === 'light' ? '🌙' : '🌞'}

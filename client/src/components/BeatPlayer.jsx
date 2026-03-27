@@ -196,7 +196,7 @@ const BeatPlayer = ({ beatUrl, beatSource = 'upload' }) => {
         {/* Play / Pause button */}
         <button
           onClick={handlePlayPause}
-          className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white font-bold w-12 h-12 rounded-full flex items-center justify-center transition-all shadow-sm shrink-0"
+          className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white font-bold w-12 h-12 rounded-full flex items-center justify-center transition-all shadow-sm hover:shadow-[0_0_15px_rgba(255,255,255,0.1)] shrink-0"
         >
           {isPlaying ? (
             <svg className="w-5 h-5 fill-current text-indigo-400" viewBox="0 0 24 24">
@@ -227,7 +227,7 @@ const BeatPlayer = ({ beatUrl, beatSource = 'upload' }) => {
           >
             {/* Filled track */}
             <div
-              className="absolute inset-y-0 left-0 rounded-full bg-indigo-500 group-hover:bg-indigo-400 transition-colors pointer-events-none"
+              className="absolute inset-y-0 left-0 rounded-full bg-indigo-500 group-hover:bg-indigo-400 group-hover:shadow-[0_0_8px_rgba(99,102,241,0.5)] transition-all pointer-events-none"
               style={{ width: `${progress}%` }}
             />
             {/* Loop Region Highlight */}
@@ -283,7 +283,7 @@ const BeatPlayer = ({ beatUrl, beatSource = 'upload' }) => {
                  onBlur={handleApplyLoop}
                  onKeyDown={(e) => e.key === 'Enter' && handleApplyLoop()}
                  placeholder="0:00"
-                 className="w-12 text-center bg-transparent outline-none text-slate-200 font-mono"
+                 className="w-12 text-center bg-transparent outline-none text-slate-200 font-mono focus:drop-shadow-[0_0_8px_rgba(255,255,255,0.2)] transition-all"
                />
                <button
                   title="Use current time"
@@ -309,7 +309,7 @@ const BeatPlayer = ({ beatUrl, beatSource = 'upload' }) => {
                  onBlur={handleApplyLoop}
                  onKeyDown={(e) => e.key === 'Enter' && handleApplyLoop()}
                  placeholder="0:00"
-                 className="w-12 text-center bg-transparent outline-none text-slate-200 font-mono"
+                 className="w-12 text-center bg-transparent outline-none text-slate-200 font-mono focus:drop-shadow-[0_0_8px_rgba(255,255,255,0.2)] transition-all"
                />
                <button
                   title="Use current time"
@@ -335,8 +335,8 @@ const BeatPlayer = ({ beatUrl, beatSource = 'upload' }) => {
                 }}
                 className={`px-4 py-1.5 rounded transition-all font-medium text-sm flex items-center gap-2 ${
                   loopEnabled 
-                    ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30' 
-                    : 'bg-slate-800 text-slate-400 border border-slate-700 hover:bg-slate-700'
+                    ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 shadow-[0_0_12px_rgba(99,102,241,0.15)] hover:shadow-[0_0_16px_rgba(99,102,241,0.25)]' 
+                    : 'bg-slate-800 text-slate-400 border border-slate-700 hover:bg-slate-700 hover:shadow-[0_0_8px_rgba(255,255,255,0.05)]'
                 }`}
               >
                 {loopEnabled && <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse"></span>}

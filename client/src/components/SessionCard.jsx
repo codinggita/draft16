@@ -14,27 +14,43 @@ const SessionCard = ({ session, onDelete }) => {
   });
 
   return (
-    <div className="glass-panel p-6 rounded-2xl shadow-lg border border-transparent dark:border-white/10 hover:shadow-xl hover:border-indigo-500/30 hover:-translate-y-1 transition-all duration-300 group flex flex-col h-full bg-white/70 dark:bg-slate-800/40">
-      <h3 className="text-xl font-display font-bold text-slate-800 dark:text-slate-100 mb-2 truncate group-hover:text-indigo-600 dark:group-hover:text-cyan-400 transition-colors">
+    <div
+      className="flex flex-col h-full transition-colors duration-150 group"
+      style={{
+        background: 'var(--bg-panel)',
+        border: '1px solid var(--border-subtle)',
+        borderRadius: '10px',
+        padding: '20px',
+      }}
+      onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-elevated)'}
+      onMouseLeave={(e) => e.currentTarget.style.background = 'var(--bg-panel)'}
+    >
+      <h3 className="text-lg font-display font-bold mb-1 truncate transition-colors" style={{ color: 'var(--text-main)' }}>
         {session.title}
       </h3>
       
       <div className="flex items-center gap-2 mb-6 text-sm">
-        <span className="text-slate-500 dark:text-slate-400">{formattedDate}</span>
-        <span className="w-1 h-1 bg-slate-300 dark:bg-slate-600 rounded-full" />
-        <span className="text-indigo-600 dark:text-cyan-400 font-medium">{session.bpm} BPM</span>
+        <span style={{ color: 'var(--text-muted)' }}>{formattedDate}</span>
+        <span className="w-1 h-1 rounded-full" style={{ background: 'var(--border-subtle)' }} />
+        <span className="font-medium" style={{ color: 'var(--accent-focus)' }}>{session.bpm} BPM</span>
       </div>
       
-      <div className="mt-auto flex gap-3 pt-4 border-t border-slate-200 dark:border-white/5">
+      <div className="mt-auto flex gap-3 pt-4" style={{ borderTop: '1px solid var(--border-subtle)' }}>
         <Link 
           to={`/sessions/${session._id}`}
-          className="flex-1 text-center bg-slate-800 dark:bg-white/10 text-white py-2.5 rounded-lg hover:bg-slate-700 dark:hover:bg-white/20 transition-all text-sm font-medium shadow-sm hover:shadow-md"
+          className="flex-1 text-center py-2 rounded-lg text-sm font-medium transition-colors text-white"
+          style={{ background: 'var(--accent-focus)' }}
+          onMouseEnter={(e) => e.currentTarget.style.opacity = '0.85'}
+          onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
         >
           Open
         </Link>
         <button 
           onClick={handleDelete}
-          className="flex-1 bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 py-2.5 rounded-lg hover:bg-red-500 hover:text-white transition-all text-sm font-medium border border-transparent hover:border-red-500"
+          className="flex-1 py-2 rounded-lg text-sm font-medium transition-colors"
+          style={{ background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-muted)' }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(239,68,68,0.08)'; e.currentTarget.style.color = '#ef4444'; e.currentTarget.style.borderColor = 'rgba(239,68,68,0.3)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.borderColor = 'var(--border-subtle)'; }}
         >
           Delete
         </button>

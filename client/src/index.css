@@ -4,55 +4,55 @@
 @theme {
   --font-sans: 'Inter', sans-serif;
   --font-display: 'Outfit', sans-serif;
-  
-  --color-brand-start: #6366f1; /* Indigo 500 */
-  --color-brand-end: #9333ea;   /* Purple 600 */
 }
 
 @custom-variant dark (&:is(.dark *));
 
+/* ─── Teal Studio Theme ───────────────────────────────────────── */
+:root {
+  --bg-base:       #f4f7f6;
+  --bg-panel:      #ffffff;
+  --bg-elevated:   #ffffff;
+  --border-subtle: #d4e0dd;
+  --text-main:     #0e1f1d;
+  --text-muted:    #5a8880;
+  --accent-focus:  #408A71;
+  --accent-soft:   #285A48;
+  --bg-hover:      rgba(64, 138, 113, 0.06);
+}
+
+.dark {
+  --bg-base:       #091413;
+  --bg-panel:      #0F1C1A;
+  --bg-elevated:   #132624;
+  --border-subtle: #1F3A36;
+  --text-main:     #E6F1EF;
+  --text-muted:    #7FA6A0;
+  --accent-focus:  #408A71;
+  --accent-soft:   #285A48;
+  --bg-hover:      rgba(64, 138, 113, 0.08);
+}
+
+/* ─── Dropdown shadows ───────────────────────────────────────── */
+.dropdown-menu {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+.dark .dropdown-menu {
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+}
+
+/* ─── Base ───────────────────────────────────────────────────── */
 body {
   margin: 0;
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: #f8fafc;
-  color: #0f172a;
+  background-color: var(--bg-base);
+  color: var(--text-main);
   transition: background-color 0.3s ease, color 0.3s ease;
-}
-
-.dark body {
-  background-color: #0B0F19; /* Deep space slate */
-  background-image: 
-    radial-gradient(at 0% 0%, hsla(253,16%,7%,1) 0, transparent 50%), 
-    radial-gradient(at 50% 0%, hsla(225,39%,30%,0.1) 0, transparent 50%), 
-    radial-gradient(at 100% 0%, hsla(339,49%,30%,0.1) 0, transparent 50%);
-  background-attachment: fixed;
-  color: #f1f5f9;
 }
 
 code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
 }
-
-/* Glassmorphism utility */
-.glass-panel {
-  background: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-}
-
-.dark .glass-panel {
-  background: rgba(15, 23, 42, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-/* Custom Gradient Text */
-.text-gradient {
-  background-clip: text;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-image: linear-gradient(to right, var(--color-brand-start), var(--color-brand-end));
-}
-
