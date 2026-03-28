@@ -377,6 +377,8 @@ const SessionEditor = () => {
   const [markers, setMarkers] = useState([]);
   const [newMarkerTime, setNewMarkerTime] = useState('');
   const [newMarkerLabel, setNewMarkerLabel] = useState('');
+  const [isFocusMode, setIsFocusMode] = useState(false);
+  const [textAlign, setTextAlign] = useState('left');
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -892,16 +894,19 @@ const SessionEditor = () => {
   if (!loading && isFirstLoad.current) isFirstLoad.current = false;
 
   return (
-    <div className="min-h-[calc(100vh-73px)] p-4 md:p-8" style={{ background: 'var(--bg-base)' }}>
-
-      <div className="max-w-[1500px] w-full mx-auto space-y-6 relative z-10">
+    <div className="min-h-[calc(100vh-73px)] p-4 md:p-8 transition-all duration-200 ease-in-out" style={{ background: 'var(--bg-base)' }}>
+      {isFocusMode && <style>{`nav { display: none !important; }`}</style>}
+      <div className={`max-w-[1500px] w-full mx-auto relative z-10 transition-all duration-200 ease-in-out ${isFocusMode ? 'space-y-0' : 'space-y-6'}`}>
         
+        {/* Minimal Focus Header has been removed per instructions to keep standard UI */}
+
+
         <div className="flex justify-between items-center p-4 rounded-lg mb-2 transition-colors" style={{ background: 'var(--bg-panel)', border: '1px solid var(--border-subtle)' }}>
           <button 
             onClick={() => navigate('/dashboard')}
             className="font-semibold transition-colors flex items-center gap-2 text-sm"
             style={{ color: 'var(--text-muted)' }}
-            onMouseEnter={(e) => e.currentTarget.style.color = 'var(--accent-focus)'}
+            onMouseEnter={(e) => e.currentTarget.style.color = 'var(--text-main)'}
             onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-muted)'}
           >
             <span>&larr;</span> Dashboard
@@ -928,7 +933,7 @@ const SessionEditor = () => {
         </div>
 
         {/* Editor Main Content */}
-        <div className="rounded-xl overflow-hidden transition-colors" style={{ background: 'var(--bg-panel)', border: '1px solid var(--border-subtle)' }}>
+        <div className={`rounded-xl overflow-hidden transition-all duration-200 ease-in-out`} style={{ background: isFocusMode ? 'var(--bg-base)' : 'var(--bg-panel)', border: isFocusMode ? 'none' : '1px solid var(--border-subtle)' }}>
           
           {/* Top Controls (Title & Beat) */}
           <div className="px-6 md:px-8 py-4 space-y-4 transition-colors" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
@@ -1037,41 +1042,56 @@ const SessionEditor = () => {
           </div>
 
           {/* Lyrics Editor (Workspace) */}
-          <div className="p-6 md:p-8 flex flex-col lg:grid lg:grid-cols-[260px_1fr] gap-8 relative">
+          <div className={`p-6 md:p-8 flex flex-col gap-8 relative transition-all duration-200 ease-in-out ${!isFocusMode ? 'lg:grid lg:grid-cols-[260px_1fr]' : ''}`} style={{ padding: isFocusMode ? '0' : '' }}>
             
             {/* Section Navigator (Left Column on Desktop, Top on Mobile) */}
-            <div className="lg:border-r border-slate-200/50 dark:border-white/5 lg:pr-6 flex flex-col gap-3">
-              <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Navigator</label>
+            {!isFocusMode && (
+            <div className="lg:border-r border-slate-200/50 dark:border-white/5 lg:pr-6 flex flex-col gap-3 transition-opacity duration-200">
+              <label className="block text-xs font-bold uppercase tracking-wider mb-2" style={{ color: '#76ABAE' }}>Navigator</label>
               
-              <div className="text-[10px] font-bold text-indigo-500 dark:text-cyan-400 uppercase tracking-widest mb-1 mt-2">Sections</div>
+              <div className="text-[10px] font-bold uppercase tracking-widest mb-1 mt-2" style={{ color: '#76ABAE' }}>Sections</div>
               <div className="overflow-y-auto space-y-1.5 mb-6 max-h-48 custom-scrollbar">
                 {parsedSections.map(section => (
                   <button
                     key={section.id}
                     onClick={() => navigateToSection(section.type)}
-                    className={`w-full text-left px-4 py-2.5 rounded-xl text-sm font-semibold transition-all border ${
-                      activeSectionId === section.id 
-                        ? 'bg-indigo-500/10 dark:bg-cyan-400/10 text-indigo-700 dark:text-cyan-300 border-indigo-500/20 dark:border-cyan-400/20 shadow-inner' 
-                        : 'bg-white/40 dark:bg-slate-900/40 text-slate-600 dark:text-slate-300 border-transparent hover:bg-white/80 dark:hover:bg-white/10 hover:border-slate-200/50 dark:hover:border-white/5'
-                    }`}
+                    className="w-full text-left px-4 py-2.5 rounded-xl text-sm transition-all border border-transparent"
+                    style={{
+                      color: activeSectionId === section.id ? '#222831' : '#31363F',
+                      fontWeight: activeSectionId === section.id ? '600' : 'normal',
+                      background: 'transparent'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (activeSectionId !== section.id) {
+                         e.currentTarget.style.background = 'rgba(118,171,174,0.08)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (activeSectionId !== section.id) {
+                         e.currentTarget.style.background = 'transparent';
+                      }
+                    }}
                   >
                     {section.type}
                   </button>
                 ))}
                 {parsedSections.length === 0 && (
-                  <div className="text-gray-400 text-sm italic px-2">No sections added yet.</div>
+                  <div className="text-sm italic px-2" style={{ color: 'var(--text-muted)' }}>No sections added yet.</div>
                 )}
               </div>
 
-              <div className="text-[10px] font-bold text-purple-500 dark:text-purple-400 uppercase tracking-widest mb-1 mt-2">Beat Markers</div>
+              <div className="text-[10px] font-bold uppercase tracking-widest mb-1 mt-2" style={{ color: '#76ABAE' }}>Beat Markers</div>
               <div className="overflow-y-auto space-y-1.5 mb-3 max-h-48 custom-scrollbar">
                 {markers.map((marker, index) => (
                   <div
                     key={index}
-                    className="group flex justify-between items-center w-full text-left px-4 py-2.5 rounded-xl text-sm font-semibold transition-all bg-white/40 dark:bg-slate-900/40 border border-transparent hover:bg-white/80 dark:hover:bg-white/10 hover:border-slate-200/50 dark:hover:border-white/5"
+                    className="group flex justify-between items-center w-full text-left px-4 py-2.5 rounded-xl text-sm transition-all border border-transparent"
+                    style={{ color: '#31363F', background: 'transparent' }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(118,171,174,0.08)'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
                   >
-                    <span className="cursor-pointer text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-cyan-300 transition-colors" onClick={() => navigateToSection(marker.label, marker.time)}>
-                      <span className="text-blue-500 mr-2">[{formatTime(marker.time)}]</span>
+                    <span className="cursor-pointer transition-colors" onClick={() => navigateToSection(marker.label, marker.time)}>
+                      <span className="mr-2" style={{ color: '#76ABAE' }}>[{formatTime(marker.time)}]</span>
                       {marker.label}
                     </span>
                     <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -1206,12 +1226,14 @@ const SessionEditor = () => {
                 <div>Characters: {characterCount}</div>
               </div>
             </div>
+            )}
 
             {/* Existing Sections Workspace (Right Column) */}
-            <div className="flex flex-col glass-panel rounded-3xl border border-transparent dark:border-white/10 shadow-2xl relative min-w-0">
+            <div className={`flex flex-col rounded-3xl relative min-w-0 transition-all duration-200 ease-in-out`}>
               
               {/* Tabs UI */}
-              <div className="flex items-end overflow-x-auto whitespace-nowrap pt-3 px-4 bg-white/20 dark:bg-slate-800/40 border-b border-slate-200/50 dark:border-white/5 min-h-[56px] relative z-20 rounded-t-3xl custom-scrollbar-horizontal">
+              {!isFocusMode && (
+              <div className="flex items-end overflow-x-auto whitespace-nowrap pt-3 px-4 bg-white/20 dark:bg-slate-800/40 border-b border-slate-200/50 dark:border-white/5 min-h-[56px] relative z-20 rounded-t-3xl custom-scrollbar-horizontal transition-opacity duration-200">
                 <DndContext collisionDetection={closestCenter} sensors={sensors} onDragEnd={handleDragEnd}>
                   <SortableContext items={drafts.map((draft, index) => index)} strategy={horizontalListSortingStrategy}>
                     {drafts.map((draft, idx) => (
@@ -1253,38 +1275,56 @@ const SessionEditor = () => {
                   + Draft
                 </button>
               </div>
+              )}
 
-              <div className="p-0 flex flex-col flex-1 h-full relative border-t border-transparent">
-                <div className="flex justify-between items-center px-6 md:px-8 py-4 bg-white/10 dark:bg-slate-900/20 border-b border-slate-200/50 dark:border-white/5">
-                  <div className="flex flex-col">
-                    <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                      Workspace
-                    </label>
-                    <span className="text-[10px] font-semibold text-indigo-500 dark:text-cyan-400 h-4 mt-0.5">
+              <div className={`p-0 flex flex-col flex-1 h-full relative border-t border-transparent transition-all duration-200 ${isFocusMode ? 'bg-[var(--bg-base)]' : ''}`}>
+                <div className="flex justify-between items-center px-6 md:px-8 py-4 border-b border-slate-200/50 dark:border-white/5 transition-opacity duration-200" style={{ background: 'transparent' }}>
+                  <div className="flex items-center">
+                    <span className="text-xs font-semibold text-indigo-500 dark:text-cyan-400">
                       {isSaving ? '● Auto-saving...' : lastSaved ? '✓ Saved' : ''}
                     </span>
                   </div>
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2 mr-2">
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => setIsFocusMode(!isFocusMode)}
+                      className="px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all shadow-[0_1px_2px_rgba(0,0,0,0.04)]"
+                      style={{ border: '1px solid var(--border-subtle)', color: isFocusMode ? 'var(--accent-focus)' : 'var(--text-muted)', background: 'transparent' }}
+                    >
+                      {isFocusMode ? 'Exit Focus' : 'Focus Mode'}
+                    </button>
+                    
+                    <div className="w-[125px]">
+                      <Dropdown
+                        value={textAlign}
+                        onChange={(val) => setTextAlign(val)}
+                        options={[
+                          { value: 'left', label: 'Align Left' },
+                          { value: 'center', label: 'Align Center' },
+                          { value: 'right', label: 'Align Right' }
+                        ]}
+                      />
+                    </div>
+
+                    <div className="flex items-center gap-2">
                       <button
                         onClick={startRecording}
                         disabled={isRecording}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all shadow-sm ${
+                        className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all shadow-[0_1px_2px_rgba(0,0,0,0.04)] ${
                           isRecording 
                             ? 'bg-red-500/10 text-red-500 border border-red-500/20 animate-pulse' 
-                            : 'bg-red-500/10 text-red-600 hover:bg-red-500 hover:text-white border border-red-500/20 dark:bg-red-500/20 dark:text-red-400 dark:border-red-500/30 hover:shadow-[0_0_12px_rgba(239,68,68,0.3)]'
+                            : 'bg-red-500/10 text-red-600 hover:bg-red-500 hover:text-white border border-red-500/20 dark:bg-red-500/20 dark:text-red-400 dark:border-red-500/30'
                         }`}
                       >
-                        <span className={`h-2.5 w-2.5 rounded-full ${isRecording ? 'bg-slate-400 dark:bg-slate-600' : 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.8)] animate-pulse'}`}></span>
+                        <span className={`h-2.5 w-2.5 rounded-full ${isRecording ? 'bg-slate-400 dark:bg-slate-600' : 'bg-red-500 animate-pulse'}`}></span>
                         Rec
                       </button>
                       <button
                         onClick={stopRecording}
                         disabled={!isRecording}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all shadow-sm border ${
+                        className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all shadow-[0_1px_2px_rgba(0,0,0,0.04)] border ${
                           !isRecording 
                             ? 'bg-slate-100 text-slate-400 border-transparent dark:bg-slate-800/50 dark:text-slate-600 cursor-not-allowed' 
-                            : 'bg-slate-800 text-white border-slate-700 hover:bg-slate-700 dark:bg-white dark:text-slate-900 dark:border-white hover:scale-105'
+                            : 'bg-slate-800 text-white border-slate-700 hover:bg-slate-700 dark:bg-white dark:text-slate-900 dark:border-white'
                         }`}
                       >
                         <span className="h-2.5 w-2.5 rounded-sm bg-current"></span>
@@ -1301,7 +1341,7 @@ const SessionEditor = () => {
                         </span>
                       )}
                     </div>
-                    <div className="w-[160px]">
+                    <div className="w-[140px]">
                       <Dropdown
                         value=""
                         onChange={(val) => {
@@ -1332,8 +1372,9 @@ const SessionEditor = () => {
                     margin-left: -8px;
                     transition: all 0.2s ease;
                     display: inline-block;
-                    margin-top: 1rem;
-                    margin-bottom: 0.25rem;
+                    margin-top: 20px;
+                    margin-bottom: 6px;
+                    opacity: 0.9;
                   }
                   .dark .cm-section-header {
                     color: var(--accent-focus);
@@ -1347,6 +1388,14 @@ const SessionEditor = () => {
                   .dark .cm-active-section {
                     background: rgba(64, 138, 113, 0.12);
                     border-left: 3px solid var(--accent-focus);
+                  }
+
+                  .cm-activeLine {
+                    background: transparent !important;
+                  }
+                  .cm-cursor {
+                    border-left-color: var(--accent-focus) !important;
+                    border-left-width: 2px !important;
                   }
                   
                   .cm-syl-0 { color: #f87171 !important; }
@@ -1374,17 +1423,39 @@ const SessionEditor = () => {
                     background: rgba(64, 138, 113, 0.15);
                   }
                   
+                  .editor-wrapper {
+                    width: 100%;
+                    display: flex;
+                    justify-content: center;
+                    padding: 0 48px;
+                  }
+
+                  .focus-mode.editor-wrapper {
+                    padding: 0 32px;
+                    justify-content: center !important;
+                  }
+                  .focus-mode .cm-editor {
+                    max-width: 1100px !important;
+                  }
+                  
                   .cm-editor {
+                    width: 100%;
+                    max-width: 1000px;
                     height: 100%;
-                    background-color: transparent;
+                    background: transparent !important;
+                    border-radius: 0;
                     font-family: inherit;
                     font-size: 1.125rem;
                     line-height: 1.7;
                     letter-spacing: 0.3px;
                   }
+                  .dark .cm-editor {
+                    background: transparent !important;
+                  }
                   .cm-scroller {
                     overflow: auto;
                     height: 100%;
+                    background: transparent !important;
                     /* Hide scrollbar for a cleaner look */
                     scrollbar-width: none;
                   }
@@ -1392,11 +1463,19 @@ const SessionEditor = () => {
                     display: none;
                   }
                   .cm-content {
-                    padding: 1rem 0;
+                    font-size: 17px;
+                    line-height: 1.8;
+                    letter-spacing: 0.01em;
+                    caret-color: var(--accent-focus);
+                    margin: 0 !important;
+                    padding: 48px 24px !important;
                     min-height: 400px;
+                    text-align: ${textAlign} !important;
                   }
                   .cm-line {
                     padding: 0;
+                    opacity: 1 !important;
+                    font-weight: 400 !important;
                   }
                   .cm-gutters {
                     display: none;
@@ -1404,8 +1483,13 @@ const SessionEditor = () => {
                   .cm-focused {
                     outline: none !important;
                   }
+                  .cm-editor:focus,
+                  .cm-editor:focus-visible,
+                  .cm-scroller:focus {
+                    outline: none !important;
+                  }
                 `}</style>
-                <div className="flex-1 w-full bg-white/40 dark:bg-slate-900/40 border border-slate-200/50 dark:border-white/5 rounded-2xl focus-within:ring-2 focus-within:ring-indigo-500/50 transition-colors p-6 md:p-8 shadow-inner" style={{ height: '600px', overflowY: 'auto' }}>
+                <div className={`editor-wrapper ${isFocusMode ? 'focus-mode' : ''} flex-1 transition-all duration-200 ease-in-out bg-transparent border-none`} style={{ height: '600px', overflowY: 'auto' }}>
                   
                   <CodeMirror
                     onCreateEditor={(view) => {
@@ -1432,7 +1516,7 @@ const SessionEditor = () => {
                 </div>
                 
                 {/* Audio Takes Display */}
-                {takes.length > 0 && (
+                {!isFocusMode && takes.length > 0 && (
                   <div className="mt-6 border-t border-slate-200/50 dark:border-white/5 pt-6 px-6 pb-6">
                     <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
                       <span className="text-lg">🎙️</span> Recorded Takes ({takes.length})
