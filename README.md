@@ -1,5 +1,5 @@
 <div align="center">
-  <h1>🌌 Draft16</h1>
+  <h1> Draft16 </h1>
   <p><strong>The Ultimate Web-Based Writing Studio for Vocalists & Songwriters</strong></p>
 </div>
 

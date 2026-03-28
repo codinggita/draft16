@@ -28,10 +28,10 @@ const Navbar = () => {
       <div className="max-w-6xl mx-auto px-6 py-4 flex justify-between items-center">
         <Link
           to="/"
-          className="font-display font-bold text-xl tracking-tight transition-opacity hover:opacity-75"
-          style={{ color: 'var(--text-main)' }}
+          className="font-display transition-opacity hover:opacity-75 flex items-center"
+          style={{ color: 'var(--text-main)', letterSpacing: '-0.05em', fontWeight: 800, fontSize: '28px' }}
         >
-          Draft16
+          Draft<span style={{ color: 'var(--accent-focus)', fontWeight: 800, marginLeft: '0.04em' }}>16</span>
         </Link>
         
         <div className="flex gap-6 items-center">
