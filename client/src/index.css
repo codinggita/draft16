@@ -16,9 +16,9 @@
   --border-subtle: #d4e0dd;
   --text-main:     #0e1f1d;
   --text-muted:    #5a8880;
-  --accent-focus:  #408A71;
-  --accent-soft:   #285A48;
-  --bg-hover:      rgba(64, 138, 113, 0.06);
+  --accent-focus:  #5f8f8b;
+  --accent-soft:   #4a726f;
+  --bg-hover:      rgba(95, 143, 139, 0.06);
 }
 
 .dark {
@@ -28,9 +28,9 @@
   --border-subtle: #1F3A36;
   --text-main:     #E6F1EF;
   --text-muted:    #7FA6A0;
-  --accent-focus:  #408A71;
-  --accent-soft:   #285A48;
-  --bg-hover:      rgba(64, 138, 113, 0.08);
+  --accent-focus:  #5f8f8b;
+  --accent-soft:   #4a726f;
+  --bg-hover:      rgba(95, 143, 139, 0.08);
 }
 
 /* ─── Dropdown shadows ───────────────────────────────────────── */
