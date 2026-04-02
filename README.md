@@ -1,102 +1,130 @@
 <div align="center">
-  <h1> Draft16 </h1>
-  <p><strong>The Ultimate Web-Based Writing Studio for Vocalists & Songwriters</strong></p>
+  <img src="./client/public/favicon.png" alt="Draft16 Logo" width="120" height="120" />
+
+  # Draft16 Studio
+
+  **The ultimate distraction-free drafting workspace tailored specifically for lyricists and songwriters.**
+  
+  [**Visit Live App**](https://draft16.vercel.app/) • [**Report Bug**](#) • [**Request Feature**](#)
 </div>
 
-## 📖 Overview
-Draft16 is a full-stack, aesthetically driven web application designed specifically for recording artists, rappers, and songwriters. It combines a distraction-free glassmorphic text editor with integrated beat playback, syllable tracking, rhyme dictionaries, and synchronized vocal recording—all in one browser window.
+<br/>
 
-Gone are the days of juggling a notes app, YouTube for beats, and a voice memo app. Draft16 brings the entire ideation studio into a single, cohesive, premium environment.
+## 🎵 About The Project
 
-## ✨ Key Features
+Draft16 is a professional-grade web application designed from the ground up for music artists, producers, and lyricists. Far too often, writers are forced to juggle multiple apps—a notes app for writing, a browser for finding beats, and a separate app for syllable counting. 
 
-### 📝 Advanced CodeMirror Writing Workspace
-- **Distraction-Free UI:** A deep-space dark mode aesthetic with frosted-glass panels and modern typography.
-- **Section Highlighting:** Automatically styles structural markers like `[Hook]`, `[Verse]`, and `[Bridge]` so you can see song structure at a glance.
-- **Multiple Drafts:** Create, drag-and-drop sort, and manage multiple drafts within a single session.
-- **Auto-save:** Never lose a bar. The editor continuously syncs with the database.
+Draft16 merges the entire creative workflow into a single, cohesive environment. 
 
-### 🧠 Intelligent Lyric Tools
-- **Syllable Counting:** Visually highlights and counts syllables per line to help you stay in the pocket.
-- **Rhyme Finder:** Integrated Datamuse API instantly fetches rhymes for selected words without switching tabs.
-- **Rhyme Scheme Visualization:** Automatically detects and color-codes rhyme schemes (AABB, ABAB) at the end of each line using a custom CodeMirror plugin.
+With a deeply considered, distraction-free UI inspired by premium tools like Notion and Figma, Draft16 allows artists to write verses, count syllables in real-time, record takes, and loop audio tracks simultaneously without ever breaking their creative flow.
 
-### 🎧 Beat Integration & Navigation
-- **BeatPlayer:** Paste a YouTube URL or upload an audio file to write alongside your instrumental.
-- **Sync Markers & Looping:** Drop timestamps while the beat plays to quickly jump between sections. Highlight a section of the beat to loop dynamically.
-- **Metronome:** Keep your timing sharp with an integrated visual metronome mapped to your custom BPM.
+### ✨ Key Features
 
-### 🎙️ In-Browser Recording (Takes)
-- **Zero-Latency Recording:** Record vocal takes directly in the browser over your beats.
-- **Sync Modes:** Record just your vocals or sync your vocals against the playing instrumental.
-- **Cloud Storage:** Takes are gracefully encoded as `WebM` and securely uploaded to Cloudinary for instant playback across devices.
+- **Distraction-Free Editor**: A fluid, typography-focused writing canvas (powered by CodeMirror) designed for writing bars without visual clutter.
+- **Integrated BeatPlayer**: Load local audio files or instantly stream YouTube beats directly alongside your lyrics, complete with loop functionality.
+- **Real-time Syllable Counting**: Built-in syllable analysis helps you perfect your flow and manage your cadences effortlessly.
+- **Instant Cloud Syncing**: Secure, real-time saving of all your sessions so your lyrics are never lost.
+- **Invisible Authentication**: Seamless, one-click Google OAuth means getting straight to writing without password fatigue.
 
-## 🛠️ Tech Stack
+---
 
-**Frontend**
-- **Framework:** [React 19](https://react.dev/) + [Vite](https://vitejs.dev/)
-- **Styling:** [Tailwind CSS v4](https://tailwindcss.com/) (Custom Space-Glassmorphism theme & Fonts: *Outfit* & *Inter*)
-- **Editor Core:** [CodeMirror 6](https://codemirror.net/)
-- **Audio:** Web Audio API & MediaRecorder API
-- **Routing:** React Router DOM
-- **State Management:** React Hooks
-- **Drag & Drop:** `@dnd-kit`
+## 📸 Interface Previews
 
-**Backend**
-- **Runtime:** Node.js + Express.js
-- **Database:** MongoDB + Mongoose
-- **Authentication:** JSON Web Tokens (JWT) & bcrypt
-- **File Storage:** Cloudinary (via Multer)
+*(Add your screenshots here by replacing the placeholder links. We recommend placing your image files in a `/screenshots` folder.)*
 
-## 🚀 Getting Started
+<div align="center">
+  <img src="https://via.placeholder.com/800x450/111827/5f8f8b?text=Landing+Page+Screenshot" alt="Draft16 Landing Page" width="800" />
+  <p><em>The intuitive and welcoming landing portal.</em></p>
+  
+  <br/>
+  
+  <img src="https://via.placeholder.com/800x450/111827/5f8f8b?text=Session+Editor+Screenshot" alt="Draft16 Session Editor" width="800" />
+  <p><em>The core editing environment featuring the integrated BeatPlayer.</em></p>
+</div>
+
+---
+
+## 🛠️ Technology Stack
+
+Draft16 is a modern Full-Stack application utilizing a decoupled client-server architecture.
+
+### Frontend (Client)
+- **Framework**: [React 19](https://react.dev/) + [Vite](https://vitejs.dev/)
+- **Styling**: Vanilla CSS with [TailwindCSS 4](https://tailwindcss.com/) overrides for maximum control.
+- **Editor**: [CodeMirror 6](https://codemirror.net/) via `@uiw/react-codemirror`
+- **Utilities**: `syllable` for lyrical analysis, `dnd-kit` for drag-and-drop interactions.
+
+### Backend (Server)
+- **Environment**: [Node.js](https://nodejs.org/) & [Express.js](https://expressjs.com/)
+- **Database**: [MongoDB](https://www.mongodb.com/) & Mongoose
+- **Authentication**: JWT (JSON Web Tokens) & Google OAuth 2.0 Integration
+- **Media Storage**: [Cloudinary](https://cloudinary.com/) (Multer integration)
+
+### Deployment
+- **Frontend Hosting**: [Vercel](https://vercel.com/)
+- **Backend Hosting**: [Render](https://render.com/)
+
+---
+
+## 🚀 Getting Started Locally
+
+To get a local copy of Draft16 up and running, follow these simple steps.
 
 ### Prerequisites
-- Node.js (v18+)
-- MongoDB connection string
-- Cloudinary account credentials
+Make sure you have Node.js and npm installed on your machine.
+* npm
+  ```sh
+  npm install npm@latest -g
+  ```
 
 ### Installation
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/yourusername/draft16.git
-   cd draft16
+
+1. **Clone the repo**
+   ```sh
+   git clone https://github.com/your-username/draft16.git
    ```
 
-2. **Backend Setup:**
-   ```bash
+2. **Setup the Backend**
+   ```sh
    cd server
    npm install
    ```
-   Create a `.env` file in the `server` directory:
-   ```env
-   PORT=5000
-   MONGO_URI=your_mongodb_connection_string
-   JWT_SECRET=your_jwt_secret
-   CLOUDINARY_CLOUD_NAME=your_cloud_name
-   CLOUDINARY_API_KEY=your_api_key
-   CLOUDINARY_API_SECRET=your_api_secret
-   ```
-   Start the backend server:
-   ```bash
-   npm run dev
-   ```
+   *Create a `.env` file in the `server` directory using `.env.example` as a template and provide your MongoDB URI and Cloudinary credentials.*
 
-3. **Frontend Setup:**
-   ```bash
+3. **Setup the Frontend**
+   ```sh
    cd ../client
    npm install
    ```
-   Start the frontend development server:
-   ```bash
+
+4. **Run both environments**
+   *You can run them in separate terminal windows.*
+   
+   *Window 1 (Backend):*
+   ```sh
+   cd server
+   npm run dev
+   ```
+   
+   *Window 2 (Frontend):*
+   ```sh
+   cd client
    npm run dev
    ```
 
-4. **Launch Draft16:**
-   Navigate to `http://localhost:5173/` in your browser.
+5. **Open Application**
+   Navigate to `http://localhost:5173` in your browser.
 
-## 🤝 Contributing
-Contributions, issues, and feature requests are welcome!
+---
 
-## 📜 License
-This project is licensed under the MIT License.
-
+## 🔒 License
+
+Distributed under the MIT License. See `LICENSE` for more information.
+
+---
+
+<div align="center">
+  Built specifically to push the culture forward. 
+  <br/>
+  <b>Draft16</b>
+</div>
