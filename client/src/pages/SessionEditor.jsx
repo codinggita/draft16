@@ -983,8 +983,15 @@ const SessionEditor = () => {
         }
       }
     } catch (error) {
-      console.error("Recording error:", error);
-      alert("Microphone access denied or not available.");
+      if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+        setError('Microphone access was denied. Please allow mic access in your browser settings and try again.');
+      } else if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
+        setError('No microphone found. Please connect a microphone and try again.');
+      } else if (!navigator.mediaDevices || !window.isSecureContext) {
+        setError('Recording requires a secure connection (HTTPS). Please access the app over HTTPS.');
+      } else {
+        setError('Could not start recording. Please check your microphone and try again.');
+      }
     }
   };
 

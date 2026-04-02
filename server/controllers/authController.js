@@ -85,7 +85,7 @@ exports.googleAuth = (req, res) => {
   oauthStateStore.set(state, Date.now() + 10 * 60 * 1000);
   
   const clientId = process.env.GOOGLE_CLIENT_ID;
-  const redirectUri = 'http://localhost:5000/api/auth/google/callback';
+  const redirectUri = `${process.env.SERVER_URL}/api/auth/google/callback`;
   const scope = 'openid email profile';
   
   const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scope)}&access_type=offline&prompt=select_account&state=${state}`;
@@ -99,7 +99,7 @@ exports.googleCallback = async (req, res) => {
 
     if (!code || !state) {
       console.error('Missing code or state from Google');
-      return res.redirect('http://localhost:5173/auth-error');
+      return res.redirect(`${process.env.CLIENT_URL}/auth-error`);
     }
 
     // Validate state
@@ -107,7 +107,7 @@ exports.googleCallback = async (req, res) => {
     if (!expiration || Date.now() > expiration) {
       if (expiration) oauthStateStore.delete(state);
       console.error('Invalid or expired state during Google OAuth callback');
-      return res.redirect('http://localhost:5173/auth-error');
+      return res.redirect(`${process.env.CLIENT_URL}/auth-error`);
     }
     // State is valid, remove it to prevent replay
     oauthStateStore.delete(state);
@@ -115,7 +115,7 @@ exports.googleCallback = async (req, res) => {
     // Exchange code for tokens
     const clientId = process.env.GOOGLE_CLIENT_ID;
     const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-    const redirectUri = 'http://localhost:5000/api/auth/google/callback';
+    const redirectUri = `${process.env.SERVER_URL}/api/auth/google/callback`;
 
     const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
@@ -135,7 +135,7 @@ exports.googleCallback = async (req, res) => {
 
     if (!tokenData.access_token) {
       console.error('Failed to get access token from Google:', tokenData);
-      return res.redirect('http://localhost:5173/auth-error');
+      return res.redirect(`${process.env.CLIENT_URL}/auth-error`);
     }
 
     // Fetch user metadata/profile
@@ -149,7 +149,7 @@ exports.googleCallback = async (req, res) => {
 
     if (!userInfo.email) {
        console.error('No email provided from Google user info');
-       return res.redirect('http://localhost:5173/auth-error');
+       return res.redirect(`${process.env.CLIENT_URL}/auth-error`);
     }
 
     // User lookup and creation
@@ -174,10 +174,10 @@ exports.googleCallback = async (req, res) => {
     const token = generateToken(user._id, user.email);
 
     // Redirect safely back to frontend with the token
-    res.redirect(`http://localhost:5173/auth-success?token=${token}`);
+    res.redirect(`${process.env.CLIENT_URL}/auth-success?token=${token}`);
 
   } catch (error) {
     console.error('Google OAuth Error:', error);
-    res.redirect('http://localhost:5173/auth-error');
+    res.redirect(`${process.env.CLIENT_URL}/auth-error`);
   }
 };

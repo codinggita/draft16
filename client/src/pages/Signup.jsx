@@ -104,7 +104,7 @@ const Signup = () => {
         {/* Google Login Button */}
         <button
           id="google-login-btn"
-          onClick={() => window.location.href = 'http://localhost:5000/api/auth/google'}
+          onClick={() => window.location.href = `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/auth/google`}
           className="w-full py-3 rounded-lg font-medium flex items-center justify-center gap-3 transition-all"
           style={{
             background: 'var(--bg-main)',

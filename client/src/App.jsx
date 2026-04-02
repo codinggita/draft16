@@ -8,6 +8,7 @@ import SessionEditor from './pages/SessionEditor';
 import NewSession from './pages/NewSession';
 import AuthSuccess from './pages/AuthSuccess';
 import AuthError from './pages/AuthError';
+import NotFound from './pages/NotFound';
 import { ThemeProvider } from './context/ThemeContext';
 
 function App() {
@@ -24,6 +25,7 @@ function App() {
         <Route path="/sessions/:id" element={<SessionEditor />} />
         <Route path="/auth-success" element={<AuthSuccess />} />
         <Route path="/auth-error" element={<AuthError />} />
+        <Route path="*" element={<NotFound />} />
       </Routes>
     </Router>
     </ThemeProvider>
