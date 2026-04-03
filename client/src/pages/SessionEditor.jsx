@@ -9,6 +9,7 @@ import YouTubePlayer from '../components/YouTubePlayer';
 import Dropdown from '../components/ui/Dropdown';
 import BpmInput from '../components/ui/BpmInput';
 import { startMetronome } from '../utils/metronome';
+import { getUserFromToken } from '../utils/auth';
 import CodeMirror from '@uiw/react-codemirror';
 import { ViewPlugin, Decoration, EditorView, WidgetType, placeholder } from '@codemirror/view';
 import { RangeSetBuilder } from '@codemirror/state';
@@ -615,6 +616,9 @@ const SortableTab = ({ draft, idx, id, activeDraftIndex, setActiveDraftIndex, on
 const SessionEditor = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+
+  const userPayload = useMemo(() => getUserFromToken(), []);
+  const isGuest = userPayload?.isGuest || false;
 
   // dnd-kit sensor with distance constraint:
   // pointer must move >=8px before drag activates, so plain taps/clicks bubble normally.
@@ -1603,39 +1607,48 @@ const SessionEditor = () => {
                     </div>
 
                     <div className="flex items-center gap-2">
-                      <button
-                        onClick={startRecording}
-                        disabled={isRecording}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all shadow-[0_1px_2px_rgba(0,0,0,0.04)] ${
-                          isRecording 
-                            ? 'bg-red-500/10 text-red-500 border border-red-500/20 animate-pulse' 
-                            : 'bg-red-500/10 text-red-600 hover:bg-red-500 hover:text-white border border-red-500/20 dark:bg-red-500/20 dark:text-red-400 dark:border-red-500/30'
-                        }`}
-                      >
-                        <span className={`h-2.5 w-2.5 rounded-full ${isRecording ? 'bg-slate-400 dark:bg-slate-600' : 'bg-red-500 animate-pulse'}`}></span>
-                        Rec
-                      </button>
-                      <button
-                        onClick={stopRecording}
-                        disabled={!isRecording}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all shadow-[0_1px_2px_rgba(0,0,0,0.04)] border ${
-                          !isRecording 
-                            ? 'bg-slate-100 text-slate-400 border-transparent dark:bg-slate-800/50 dark:text-slate-600 cursor-not-allowed' 
-                            : 'bg-slate-800 text-white border-slate-700 hover:bg-slate-700 dark:bg-white dark:text-slate-900 dark:border-white'
-                        }`}
-                      >
-                        <span className="h-2.5 w-2.5 rounded-sm bg-current"></span>
-                        Stop
-                      </button>
-                      {isRecording && recordingMode && (
-                        <span className={`flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider px-3 py-1.5 rounded-full border ${
-                          recordingMode === 'mic+beat'
-                            ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:text-emerald-400'
-                            : 'bg-amber-500/10 text-amber-600 border-amber-500/20 dark:text-amber-400'
-                        }`}>
-                          <span className="animate-pulse h-1.5 w-1.5 rounded-full bg-current"></span>
-                          {recordingMode === 'mic+beat' ? 'Mic + Beat' : 'Mic Only'}
-                        </span>
+                      {!isGuest ? (
+                        <>
+                          <button
+                            onClick={startRecording}
+                            disabled={isRecording}
+                            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all shadow-[0_1px_2px_rgba(0,0,0,0.04)] ${
+                              isRecording 
+                                ? 'bg-red-500/10 text-red-500 border border-red-500/20 animate-pulse' 
+                                : 'bg-red-500/10 text-red-600 hover:bg-red-500 hover:text-white border border-red-500/20 dark:bg-red-500/20 dark:text-red-400 dark:border-red-500/30'
+                            }`}
+                          >
+                            <span className={`h-2.5 w-2.5 rounded-full ${isRecording ? 'bg-slate-400 dark:bg-slate-600' : 'bg-red-500 animate-pulse'}`}></span>
+                            Rec
+                          </button>
+                          <button
+                            onClick={stopRecording}
+                            disabled={!isRecording}
+                            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all shadow-[0_1px_2px_rgba(0,0,0,0.04)] border ${
+                              !isRecording 
+                                ? 'bg-slate-100 text-slate-400 border-transparent dark:bg-slate-800/50 dark:text-slate-600 cursor-not-allowed' 
+                                : 'bg-slate-800 text-white border-slate-700 hover:bg-slate-700 dark:bg-white dark:text-slate-900 dark:border-white'
+                            }`}
+                          >
+                            <span className="h-2.5 w-2.5 rounded-sm bg-current"></span>
+                            Stop
+                          </button>
+                          {isRecording && recordingMode && (
+                            <span className={`flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider px-3 py-1.5 rounded-full border ${
+                              recordingMode === 'mic+beat'
+                                ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:text-emerald-400'
+                                : 'bg-amber-500/10 text-amber-600 border-amber-500/20 dark:text-amber-400'
+                            }`}>
+                              <span className="animate-pulse h-1.5 w-1.5 rounded-full bg-current"></span>
+                              {recordingMode === 'mic+beat' ? 'Mic + Beat' : 'Mic Only'}
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-500/10 text-amber-600 border border-amber-500/20 shadow-sm" title="Guest users cannot record audio">
+                          <Mic2 size={14} className="opacity-70" />
+                          <span className="text-[10px] uppercase tracking-wider font-bold">Sign up to Record</span>
+                        </div>
                       )}
                     </div>
                     <div className="w-[140px]">

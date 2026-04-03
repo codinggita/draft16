@@ -6,8 +6,8 @@ const crypto = require('crypto');
 // In-memory store for OAuth states (state -> expiry timestamp)
 const oauthStateStore = new Map();
 
-const generateToken = (userId, email) => {
-  return jwt.sign({ userId, email }, process.env.JWT_SECRET, {
+const generateToken = (userId, email, isGuest = false) => {
+  return jwt.sign({ userId, email, isGuest }, process.env.JWT_SECRET, {
     expiresIn: '7d',
   });
 };
@@ -37,7 +37,7 @@ exports.signup = async (req, res) => {
 
     if (user) {
       res.status(201).json({
-        token: generateToken(user._id, user.email),
+        token: generateToken(user._id, user.email, user.isGuest),
         user: {
           id: user._id,
           username: user.username,
@@ -64,7 +64,7 @@ exports.login = async (req, res) => {
 
     if (user && (await bcrypt.compare(password, user.password))) {
       res.json({
-        token: generateToken(user._id, user.email),
+        token: generateToken(user._id, user.email, user.isGuest),
         user: {
           id: user._id,
           username: user.username,
@@ -171,7 +171,7 @@ exports.googleCallback = async (req, res) => {
     }
 
     // JWT Creation matching the application schema
-    const token = generateToken(user._id, user.email);
+    const token = generateToken(user._id, user.email, user.isGuest);
 
     // Redirect safely back to frontend with the token
     res.redirect(`${process.env.CLIENT_URL}/auth-success?token=${token}`);
@@ -192,7 +192,7 @@ exports.guestLogin = async (req, res) => {
     });
 
     res.status(201).json({
-      token: generateToken(guestUser._id, guestUser.email),
+      token: generateToken(guestUser._id, guestUser.email, true),
       user: {
         id: guestUser._id,
         username: guestUser.username,
