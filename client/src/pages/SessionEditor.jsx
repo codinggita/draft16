@@ -636,6 +636,7 @@ const SessionEditor = () => {
   const [bpm, setBpm] = useState(120);
   const [metronomeOn, setMetronomeOn] = useState(false);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+  const [isRecordedTakesOpen, setIsRecordedTakesOpen] = useState(false);
   
   const [isRecording, setIsRecording] = useState(false);
   const [takes, setTakes] = useState([]);
@@ -1169,9 +1170,9 @@ const SessionEditor = () => {
   if (!loading && isFirstLoad.current) isFirstLoad.current = false;
 
   return (
-    <div className="min-h-[calc(100vh-73px)] p-4 md:p-8 transition-all duration-200 ease-in-out" style={{ background: 'var(--bg-main)' }}>
+    <div className="min-h-[calc(100vh-73px)] px-2 py-4 md:p-8 w-full max-w-full transition-all duration-200 ease-in-out" style={{ background: 'var(--bg-main)' }}>
       {isFocusMode && <style>{`nav { display: none !important; }`}</style>}
-      <div className={`max-w-[1500px] w-full mx-auto relative z-10 transition-all duration-200 ease-in-out ${isFocusMode ? 'space-y-0' : 'space-y-6'}`}>
+      <div className={`max-w-[1500px] w-full max-w-full mx-auto relative z-10 transition-all duration-200 ease-in-out ${isFocusMode ? 'space-y-0' : 'space-y-4 md:space-y-6'}`}>
         
         {/* Minimal Focus Header has been removed per instructions to keep standard UI */}
 
@@ -1325,7 +1326,7 @@ const SessionEditor = () => {
           </div>
 
           {/* Lyrics Editor (Workspace) */}
-          <div className={`p-6 md:p-8 flex flex-col gap-8 relative transition-all duration-200 ease-in-out ${!isFocusMode ? 'lg:grid lg:grid-cols-[260px_1fr]' : ''}`} style={{ padding: isFocusMode ? '0' : '' }}>
+          <div className={`px-2 py-4 sm:p-4 md:p-8 flex flex-col gap-4 md:gap-8 relative transition-all duration-200 ease-in-out ${!isFocusMode ? 'lg:grid lg:grid-cols-[260px_1fr]' : ''}`} style={{ padding: isFocusMode ? '0' : '' }}>
             
             {/* Section Navigator */}
             {!isFocusMode && (
@@ -1618,22 +1619,34 @@ const SessionEditor = () => {
                   overflow: 'hidden',
                 }}
               >
-                <div className="flex justify-between items-center px-6 md:px-8 py-4 border-b border-slate-200/50 dark:border-white/5 transition-opacity duration-200" style={{ background: 'transparent' }}>
-                  <div className="flex items-center">
+                <div className="flex flex-col sm:flex-row sm:justify-between items-start sm:items-center px-4 md:px-8 py-4 border-b border-slate-200/50 dark:border-white/5 transition-opacity duration-200 gap-3" style={{ background: 'transparent' }}>
+                  <div className="flex items-center justify-between w-full sm:w-auto">
                     <span className="text-xs font-semibold text-indigo-500 dark:text-cyan-400">
                       {isSaving ? '● Auto-saving...' : lastSaved ? '✓ Saved' : ''}
                     </span>
-                  </div>
-                  <div className="flex items-center gap-3 overflow-x-auto whitespace-nowrap no-scrollbar max-w-full">
+                    {/* Focus Mode button on mobile (top right of editor header) */}
                     <button
                       onClick={() => setIsFocusMode(!isFocusMode)}
-                      className="px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all shadow-[0_1px_2px_rgba(0,0,0,0.04)]"
+                      className="sm:hidden px-2 py-1.5 flex items-center gap-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all shadow-[0_1px_2px_rgba(0,0,0,0.04)]"
                       style={{ border: '1px solid var(--bg-border)', color: isFocusMode ? 'var(--accent-primary)' : 'var(--text-muted)', background: 'transparent' }}
                     >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
+                      {isFocusMode && 'Exit'}
+                    </button>
+                  </div>
+                  
+                  <div className="flex flex-wrap items-center gap-2 max-w-full">
+                    {/* Focus Mode button on desktop */}
+                    <button
+                      onClick={() => setIsFocusMode(!isFocusMode)}
+                      className="hidden sm:flex px-3 py-1.5 items-center gap-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all shadow-[0_1px_2px_rgba(0,0,0,0.04)]"
+                      style={{ border: '1px solid var(--bg-border)', color: isFocusMode ? 'var(--accent-primary)' : 'var(--text-muted)', background: 'transparent' }}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
                       {isFocusMode ? 'Exit Focus' : 'Focus Mode'}
                     </button>
                     
-                    <div className="w-[125px]">
+                    <div className="w-[110px] sm:w-[125px]">
                       <Dropdown
                         value={textAlign}
                         onChange={(val) => setTextAlign(val)}
@@ -1782,11 +1795,17 @@ const SessionEditor = () => {
                     width: 100%;
                     display: flex;
                     justify-content: center;
-                    padding: 0 48px;
+                    padding: 0;
+                  }
+                  
+                  @media (min-width: 768px) {
+                    .editor-wrapper {
+                      padding: 0 48px;
+                    }
                   }
 
                   .focus-mode.editor-wrapper {
-                    padding: 0 32px;
+                    padding: 0 16px;
                     justify-content: center !important;
                   }
                   .focus-mode .cm-editor {
@@ -1819,13 +1838,20 @@ const SessionEditor = () => {
                   }
                   .cm-content {
                     font-size: 17px;
-                    line-height: 1.7;
+                    line-height: 1.85;
                     letter-spacing: 0.01em;
                     caret-color: var(--accent-primary);
                     margin: 0 !important;
-                    padding: 24px 28px !important;
+                    padding: 16px 8px !important;
                     min-height: 400px;
                     text-align: ${textAlign} !important;
+                  }
+
+                  @media (min-width: 768px) {
+                    .cm-content {
+                      padding: 24px 28px !important;
+                      font-size: 18px;
+                    }
                   }
                   .cm-line {
                     padding: 0;
@@ -1874,11 +1900,22 @@ const SessionEditor = () => {
 
               {/* Audio Takes Display */}
               {!isFocusMode && takes.length > 0 && (
-                <div style={{ marginTop: '24px', padding: '24px 32px', borderRadius: '16px', background: 'var(--take-container-bg)', border: '1px solid var(--take-container-border)', boxShadow: 'var(--take-container-shadow)' }}>
-                  <div style={{ fontSize: '12px', fontWeight: 500, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--take-header-color)', marginBottom: '16px' }}>
-                    Recorded Takes ({takes.length})
-                  </div>
-                  <div className="space-y-[12px]">
+                <div style={{ marginTop: '16px', padding: '16px 20px', borderRadius: '16px', background: 'var(--take-container-bg)', border: '1px solid var(--take-container-border)', boxShadow: 'var(--take-container-shadow)' }}>
+                  <button 
+                    onClick={() => setIsRecordedTakesOpen(!isRecordedTakesOpen)}
+                    style={{ fontSize: '12px', fontWeight: 500, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--take-header-color)', width: '100%', textAlign: 'left', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', background: 'transparent', border: 'none', padding: 0 }}
+                  >
+                    <span>Recorded Takes ({takes.length})</span>
+                    <svg 
+                      width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" 
+                      style={{ transform: isRecordedTakesOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s ease' }}
+                    >
+                      <path d="M6 9l6 6 6-6" />
+                    </svg>
+                  </button>
+                  
+                  {isRecordedTakesOpen && (
+                    <div className="space-y-[12px] mt-4">
                     {takes.map((take, index) => (
                       <TakeCard
                         key={take._id || take.id}
@@ -1891,9 +1928,12 @@ const SessionEditor = () => {
                         setEditingTakeId={setEditingTakeId}
                         handlePlayTakeSync={handlePlayTakeSync}
                         onDelete={(takeIdentifier) => setTakes(takes.filter(t => t._id !== takeIdentifier && t.id !== takeIdentifier))}
+                        handleSetRecordingMode={handleSetRecordingMode}
+                        recordingMode={recordingMode}
                       />
                     ))}
                   </div>
+                  )}
                 </div>
               )}
             </div>
