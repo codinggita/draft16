@@ -32,22 +32,22 @@ With a deeply considered, distraction-free UI inspired by premium tools like Not
 
 
 <div align="center">
-  <img src="./screenshots/landing.png" alt="Draft16 Landing Page" width="800" />
+  <img src="./.github/assets/landing.png" alt="Draft16 Landing Page" width="800" />
   <p><em>The intuitive and welcoming landing portal.</em></p>
   
   <br/>
 
-  <img src="./screenshots/dashboard-dark.png" alt="Draft16 Dashboard (Dark Mode)" width="800" />
+  <img src="./.github/assets/dashboard-dark.png" alt="Draft16 Dashboard (Dark Mode)" width="800" />
   <p><em>Managing your sessions and creative projects.</em></p>
   
   <br/>
 
-  <img src="./screenshots/editor.png" alt="Draft16 Session Editor" width="800" />
+  <img src="./.github/assets/editor.png" alt="Draft16 Session Editor" width="800" />
   <p><em>The core editing environment featuring the integrated BeatPlayer and syllable counter.</em></p>
 
   <br/>
 
-  <img src="./screenshots/dashboard-light.png" alt="Draft16 Dashboard (Light Mode)" width="800" />
+  <img src="./.github/assets/dashboard-light.png" alt="Draft16 Dashboard (Light Mode)" width="800" />
   <p><em>Seamless light mode support for different studio environments.</em></p>
 </div>
 
