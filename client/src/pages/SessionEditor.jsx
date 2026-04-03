@@ -1274,17 +1274,45 @@ const SessionEditor = () => {
             <div className="flex items-center justify-start gap-4 mt-2">
               <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all duration-200" style={{ background: 'var(--bg-surface)', border: '1px solid var(--bg-border)', boxShadow: 'var(--shadow-soft)' }}>
                 <label className="text-sm font-medium transition-colors" style={{ color: 'var(--accent-primary)' }}>BPM</label>
-                <input 
-                  type="number"
-                  value={bpm}
-                  min="40"
-                  max="220"
-                  onChange={(e) => setBpm(Number(e.target.value))}
-                  className="w-16 p-1 text-center rounded outline-none font-mono text-sm transition-all"
-                  style={{ background: 'var(--bg-main)', border: '1px solid var(--bg-border)', color: 'var(--text-main)' }}
+                <div 
+                  className="flex items-center rounded transition-all"
+                  style={{ background: 'var(--bg-main)', border: '1px solid var(--bg-border)' }}
                   onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--accent-primary)'; e.currentTarget.style.boxShadow = 'var(--accent-glow)'; }}
                   onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--bg-border)'; e.currentTarget.style.boxShadow = 'none'; }}
-                />
+                >
+                  <input 
+                    type="number"
+                    value={bpm}
+                    min="40"
+                    max="220"
+                    onChange={(e) => setBpm(Number(e.target.value))}
+                    className="w-12 p-1 cursor-text text-center outline-none font-mono text-sm"
+                    style={{ background: 'transparent', border: 'none', color: 'var(--text-main)', appearance: 'textfield', MozAppearance: 'textfield' }}
+                  />
+                  <div className="flex flex-col border-l" style={{ borderColor: 'var(--bg-border)' }}>
+                    <button 
+                      onClick={() => setBpm(Math.min(220, bpm + 1))}
+                      className="flex items-center justify-center w-5 h-[15px] transition-colors text-[8px] cursor-pointer"
+                      style={{ color: 'var(--text-muted)' }}
+                      onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-hover)'}
+                      onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                      tabIndex="-1"
+                    >
+                      ▲
+                    </button>
+                    <div className="w-full h-px" style={{ background: 'var(--bg-border)' }}></div>
+                    <button 
+                      onClick={() => setBpm(Math.max(40, bpm - 1))}
+                      className="flex items-center justify-center w-5 h-[15px] transition-colors text-[8px] cursor-pointer"
+                      style={{ color: 'var(--text-muted)' }}
+                      onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-hover)'}
+                      onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                      tabIndex="-1"
+                    >
+                      ▼
+                    </button>
+                  </div>
+                </div>
               </div>
               <button
                 onClick={() => setMetronomeOn(!metronomeOn)}
