@@ -1634,115 +1634,227 @@ const SessionEditor = () => {
                   overflow: 'hidden',
                 }}
               >
-                <div className="flex flex-col sm:flex-row sm:justify-between items-start sm:items-center px-4 md:px-8 py-4 border-b border-slate-200/50 dark:border-white/5 transition-opacity duration-200 gap-3" style={{ background: 'transparent' }}>
-                  <div className="flex items-center justify-between w-full sm:w-auto">
-                    <span className="text-xs font-semibold text-indigo-500 dark:text-cyan-400">
-                      {isSaving ? '● Auto-saving...' : lastSaved ? '✓ Saved' : ''}
+                {/* ── Editor Toolbar ── */}
+                <div
+                  className="px-3 md:px-8 py-3 border-b border-slate-200/50 dark:border-white/5 transition-opacity duration-200"
+                  style={{ background: 'transparent' }}
+                >
+
+                  {/* ── MOBILE: single clean row ── */}
+                  <div className="flex sm:hidden items-center justify-between gap-2" style={{ minWidth: 0 }}>
+
+                    {/* Left: Auto-save indicator */}
+                    <span className="text-xs font-semibold text-indigo-500 dark:text-cyan-400 shrink-0 min-w-0 truncate" style={{ maxWidth: '70px' }}>
+                      {isSaving ? '● Saving' : lastSaved ? '✓ Saved' : ''}
                     </span>
-                    {/* Focus Mode button on mobile (top right of editor header) */}
-                    <button
-                      onClick={() => setIsFocusMode(!isFocusMode)}
-                      className="sm:hidden px-2 py-1.5 flex items-center gap-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all shadow-[0_1px_2px_rgba(0,0,0,0.04)]"
-                      style={{ border: '1px solid var(--bg-border)', color: isFocusMode ? 'var(--accent-primary)' : 'var(--text-muted)', background: 'transparent' }}
-                    >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
-                      {isFocusMode && 'Exit'}
-                    </button>
-                  </div>
-                  
-                  <div className="flex flex-wrap items-center gap-2 max-w-full">
-                    {/* Focus Mode button on desktop */}
-                    <button
-                      onClick={() => setIsFocusMode(!isFocusMode)}
-                      className="hidden sm:flex px-3 py-1.5 items-center gap-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all shadow-[0_1px_2px_rgba(0,0,0,0.04)]"
-                      style={{ border: '1px solid var(--bg-border)', color: isFocusMode ? 'var(--accent-primary)' : 'var(--text-muted)', background: 'transparent' }}
-                    >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
-                      {isFocusMode ? 'Exit Focus' : 'Focus Mode'}
-                    </button>
-                    
-                    <div className="w-[110px] sm:w-[125px]">
-                      <Dropdown
-                        value={textAlign}
-                        onChange={(val) => setTextAlign(val)}
-                        options={[
-                          { value: 'left', label: 'Align Left' },
-                          { value: 'center', label: 'Align Center' },
-                          { value: 'right', label: 'Align Right' }
-                        ]}
-                      />
-                    </div>
 
-                    <div className="h-6 w-px" style={{ background: 'var(--bg-border)' }}></div>
+                    {/* Centre-right controls: Align | Record/Stop | + Section */}
+                    <div className="flex items-center gap-2 shrink-0">
 
-                    <div className="flex items-center gap-2">
+                      {/* Align Dropdown — compact */}
+                      <div style={{ width: '100px' }}>
+                        <Dropdown
+                          compact
+                          value={textAlign}
+                          onChange={(val) => setTextAlign(val)}
+                          options={[
+                            { value: 'left', label: 'Align Left' },
+                            { value: 'center', label: 'Align Center' },
+                            { value: 'right', label: 'Align Right' }
+                          ]}
+                        />
+                      </div>
+
+                      {/* Record / Stop toggle */}
                       {!isGuest ? (
-                        <>
-                          <button
-                            onClick={startRecording}
-                            disabled={isRecording}
-                            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all shadow-[0_1px_2px_rgba(0,0,0,0.04)] ${
-                              isRecording 
-                                ? 'bg-red-500/10 text-red-500 border border-red-500/20 animate-pulse' 
-                                : 'bg-red-500/10 text-red-600 hover:bg-red-500 hover:text-white border border-red-500/20 dark:bg-red-500/20 dark:text-red-400 dark:border-red-500/30'
-                            }`}
-                          >
-                            <span className={`h-2.5 w-2.5 rounded-full ${isRecording ? 'bg-slate-400 dark:bg-slate-600' : 'bg-red-500 animate-pulse'}`}></span>
-                            Rec
-                          </button>
-                          <button
-                            onClick={stopRecording}
-                            disabled={!isRecording}
-                            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all shadow-[0_1px_2px_rgba(0,0,0,0.04)] border ${
-                              !isRecording 
-                                ? 'bg-slate-100 text-slate-400 border-transparent dark:bg-slate-800/50 dark:text-slate-600 cursor-not-allowed' 
-                                : 'bg-slate-800 text-white border-slate-700 hover:bg-slate-700 dark:bg-white dark:text-slate-900 dark:border-white'
-                            }`}
-                          >
-                            <span className="h-2.5 w-2.5 rounded-sm bg-current"></span>
-                            Stop
-                          </button>
-                          {isRecording && recordingMode && (
-                            <span className={`flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider px-3 py-1.5 rounded-full border ${
-                              recordingMode === 'mic+beat'
-                                ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:text-emerald-400'
-                                : 'bg-amber-500/10 text-amber-600 border-amber-500/20 dark:text-amber-400'
-                            }`}>
-                              <span className="animate-pulse h-1.5 w-1.5 rounded-full bg-current"></span>
-                              {recordingMode === 'mic+beat' ? 'Mic + Beat' : 'Mic Only'}
-                            </span>
+                        <button
+                          id="mobile-record-toggle"
+                          onClick={isRecording ? stopRecording : startRecording}
+                          className="shrink-0 flex items-center gap-1.5 px-3 rounded-lg text-sm font-bold transition-all"
+                          style={{
+                            height: '36px',
+                            border: isRecording
+                              ? '1px solid rgba(239,68,68,0.35)'
+                              : '1px solid rgba(239,68,68,0.25)',
+                            background: isRecording
+                              ? 'rgba(239,68,68,0.12)'
+                              : 'rgba(239,68,68,0.08)',
+                            color: isRecording ? '#ef4444' : '#dc2626',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {isRecording ? (
+                            <>
+                              {/* Stop icon square */}
+                              <span style={{ display: 'inline-block', width: '9px', height: '9px', background: 'currentColor', borderRadius: '2px', flexShrink: 0 }} />
+                              Stop
+                            </>
+                          ) : (
+                            <>
+                              {/* Record dot */}
+                              <span style={{ display: 'inline-block', width: '9px', height: '9px', background: '#ef4444', borderRadius: '50%', flexShrink: 0, animation: 'none' }} />
+                              Record
+                            </>
                           )}
-                        </>
+                        </button>
                       ) : (
-                        <button 
+                        <button
                           onClick={() => navigate('/signup')}
-                          className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-500/10 text-amber-600 border border-amber-500/20 shadow-sm hover:bg-amber-500/20 transition-colors cursor-pointer" 
+                          className="shrink-0 flex items-center gap-1.5 px-3 rounded-lg text-sm font-bold transition-all"
+                          style={{
+                            height: '36px',
+                            border: '1px solid rgba(217,119,6,0.25)',
+                            background: 'rgba(217,119,6,0.08)',
+                            color: '#d97706',
+                            whiteSpace: 'nowrap',
+                          }}
                           title="Create a free account to unlock recording"
                         >
-                          <Mic2 size={14} className="opacity-70" />
-                          <span className="text-[10px] uppercase tracking-wider font-bold">Sign up to Record</span>
+                          <Mic2 size={13} />
+                          Record
                         </button>
                       )}
-                    </div>
-                    <div className="w-[140px]">
-                      <Dropdown
-                        value=""
-                        onChange={(val) => {
-                          if (val) {
-                            insertSection(val);
-                          }
-                        }}
-                        placeholder="+ Add Section"
-                        options={[
-                          { value: 'Hook', label: 'Hook' },
-                          { value: 'Verse', label: 'Verse' },
-                          { value: 'Bridge', label: 'Bridge' },
-                          { value: 'Intro', label: 'Intro' },
-                          { value: 'Outro', label: 'Outro' }
-                        ]}
-                      />
+
+                      {/* + Section Dropdown */}
+                      <div className="shrink-0" style={{ width: '106px' }}>
+                        <Dropdown
+                          compact
+                          value=""
+                          onChange={(val) => { if (val) insertSection(val); }}
+                          placeholder="+ Section"
+                          options={[
+                            { value: 'Hook', label: 'Hook' },
+                            { value: 'Verse', label: 'Verse' },
+                            { value: 'Bridge', label: 'Bridge' },
+                            { value: 'Intro', label: 'Intro' },
+                            { value: 'Outro', label: 'Outro' }
+                          ]}
+                        />
+                      </div>
                     </div>
                   </div>
+
+                  {/* Recording mode pill — mobile only, shown below the row when active */}
+                  {isRecording && recordingMode && (
+                    <div className="sm:hidden mt-2 flex items-center gap-1.5">
+                      <span className={`flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider px-3 py-1 rounded-full border ${
+                        recordingMode === 'mic+beat'
+                          ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:text-emerald-400'
+                          : 'bg-amber-500/10 text-amber-600 border-amber-500/20 dark:text-amber-400'
+                      }`}>
+                        <span className="animate-pulse h-1.5 w-1.5 rounded-full bg-current"></span>
+                        {recordingMode === 'mic+beat' ? 'Mic + Beat' : 'Mic Only'}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* ── DESKTOP: full toolbar ── */}
+                  <div className="hidden sm:flex sm:flex-row sm:justify-between items-center gap-3">
+                    <div className="flex items-center justify-between w-full sm:w-auto">
+                      <span className="text-xs font-semibold text-indigo-500 dark:text-cyan-400">
+                        {isSaving ? '● Auto-saving...' : lastSaved ? '✓ Saved' : ''}
+                      </span>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2 max-w-full">
+                      {/* Focus Mode — desktop */}
+                      <button
+                        onClick={() => setIsFocusMode(!isFocusMode)}
+                        className="flex px-3 py-1.5 items-center gap-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all shadow-[0_1px_2px_rgba(0,0,0,0.04)]"
+                        style={{ border: '1px solid var(--bg-border)', color: isFocusMode ? 'var(--accent-primary)' : 'var(--text-muted)', background: 'transparent' }}
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
+                        {isFocusMode ? 'Exit Focus' : 'Focus Mode'}
+                      </button>
+
+                      {/* Focus Mode — mobile (inside desktop column to keep DOM order clean) */}
+                      <button
+                        onClick={() => setIsFocusMode(!isFocusMode)}
+                        className="sm:hidden px-2 py-1.5 flex items-center gap-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all shadow-[0_1px_2px_rgba(0,0,0,0.04)]"
+                        style={{ border: '1px solid var(--bg-border)', color: isFocusMode ? 'var(--accent-primary)' : 'var(--text-muted)', background: 'transparent' }}
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
+                        {isFocusMode && 'Exit'}
+                      </button>
+
+                      <div className="w-[125px]">
+                        <Dropdown
+                          value={textAlign}
+                          onChange={(val) => setTextAlign(val)}
+                          options={[
+                            { value: 'left', label: 'Align Left' },
+                            { value: 'center', label: 'Align Center' },
+                            { value: 'right', label: 'Align Right' }
+                          ]}
+                        />
+                      </div>
+
+                      <div className="h-6 w-px" style={{ background: 'var(--bg-border)' }}></div>
+
+                      <div className="flex items-center gap-2">
+                        {!isGuest ? (
+                          <>
+                            <button
+                              id="desktop-record-toggle"
+                              onClick={isRecording ? stopRecording : startRecording}
+                              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all shadow-[0_1px_2px_rgba(0,0,0,0.04)] border ${
+                                isRecording
+                                  ? 'bg-red-500/10 text-red-500 border-red-500/20 animate-pulse'
+                                  : 'bg-red-500/10 text-red-600 hover:bg-red-500 hover:text-white border-red-500/20 dark:bg-red-500/20 dark:text-red-400 dark:border-red-500/30'
+                              }`}
+                            >
+                              {isRecording ? (
+                                <>
+                                  <span className="h-2.5 w-2.5 rounded-sm bg-current"></span>
+                                  Stop
+                                </>
+                              ) : (
+                                <>
+                                  <span className="h-2.5 w-2.5 rounded-full bg-red-500 animate-pulse"></span>
+                                  Rec
+                                </>
+                              )}
+                            </button>
+                            {isRecording && recordingMode && (
+                              <span className={`flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider px-3 py-1.5 rounded-full border ${
+                                recordingMode === 'mic+beat'
+                                  ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:text-emerald-400'
+                                  : 'bg-amber-500/10 text-amber-600 border-amber-500/20 dark:text-amber-400'
+                              }`}>
+                                <span className="animate-pulse h-1.5 w-1.5 rounded-full bg-current"></span>
+                                {recordingMode === 'mic+beat' ? 'Mic + Beat' : 'Mic Only'}
+                              </span>
+                            )}
+                          </>
+                        ) : (
+                          <button
+                            onClick={() => navigate('/signup')}
+                            className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-500/10 text-amber-600 border border-amber-500/20 shadow-sm hover:bg-amber-500/20 transition-colors cursor-pointer"
+                            title="Create a free account to unlock recording"
+                          >
+                            <Mic2 size={14} className="opacity-70" />
+                            <span className="text-[10px] uppercase tracking-wider font-bold">Sign up to Record</span>
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="w-[140px]">
+                        <Dropdown
+                          value=""
+                          onChange={(val) => { if (val) insertSection(val); }}
+                          placeholder="+ Section"
+                          options={[
+                            { value: 'Hook', label: 'Hook' },
+                            { value: 'Verse', label: 'Verse' },
+                            { value: 'Bridge', label: 'Bridge' },
+                            { value: 'Intro', label: 'Intro' },
+                            { value: 'Outro', label: 'Outro' }
+                          ]}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
                 </div>
                 <style>{`
                   .cm-section-header {

@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 
-const Dropdown = ({ value, onChange, options, placeholder = "Select...", className = "" }) => {
+const Dropdown = ({ value, onChange, options, placeholder = "Select...", className = "", compact = false }) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
 
@@ -27,7 +27,7 @@ const Dropdown = ({ value, onChange, options, placeholder = "Select...", classNa
         style={{
           background: 'var(--bg-elevated)',
           border: '1px solid var(--bg-border)',
-          padding: '10px 14px',
+          padding: compact ? '6px 10px' : '10px 14px',
           borderRadius: '8px',
           color: 'var(--text-main)',
           borderColor: isOpen ? 'var(--accent-primary)' : 'var(--bg-border)',
