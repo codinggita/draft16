@@ -6,7 +6,8 @@ const userSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true },
   password: { type: String }, // Made optional for OAuth users
   avatar: { type: String },
-  themePreference: { type: String, default: 'dark' }
+  themePreference: { type: String, default: 'dark' },
+  isGuest: { type: Boolean, default: false }
 }, {
   timestamps: true
 });

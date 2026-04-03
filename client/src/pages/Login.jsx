@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { login } from '../services/authService';
+import { login, guestLogin } from '../services/authService';
 import { setToken } from '../utils/auth';
 
 const Login = () => {
@@ -28,6 +28,21 @@ const Login = () => {
 
   const handleGoogleLogin = () => {
     window.location.href = `${import.meta.env.VITE_API_URL || 'https://draft16.onrender.com/api'}/auth/google`;
+  };
+
+  const handleGuestLogin = async () => {
+    setError(null);
+    setLoading(true);
+    
+    try {
+      const data = await guestLogin();
+      setToken(data.token);
+      navigate('/dashboard');
+    } catch (err) {
+      setError(err.response?.data?.message || 'Guest login failed');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -63,6 +78,37 @@ const Login = () => {
             <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0 5.482 0 2.438 2.017.957 4.958L3.964 6.29C4.672 4.163 6.656 3.58 9 3.58z" fill="currentColor"/>
           </svg>
           Continue with Google
+        </button>
+
+        {/* Guest Login Button */}
+        <button
+          onClick={handleGuestLogin}
+          disabled={loading}
+          className="w-full py-3 mt-3 rounded-lg font-medium flex items-center justify-center gap-3 transition-all"
+          style={{
+            background: 'var(--bg-elevated)',
+            border: '1px dashed var(--bg-border)',
+            color: 'var(--text-muted)',
+            cursor: loading ? 'not-allowed' : 'pointer',
+          }}
+          onMouseEnter={(e) => {
+            if (!loading) {
+              e.currentTarget.style.borderColor = 'var(--text-muted)';
+              e.currentTarget.style.color = 'var(--text-main)';
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (!loading) {
+              e.currentTarget.style.borderColor = 'var(--bg-border)';
+              e.currentTarget.style.color = 'var(--text-muted)';
+            }
+          }}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+            <circle cx="12" cy="7" r="4"></circle>
+          </svg>
+          Continue as Guest
         </button>
 
         {/* Divider */}

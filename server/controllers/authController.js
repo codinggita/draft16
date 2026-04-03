@@ -181,3 +181,26 @@ exports.googleCallback = async (req, res) => {
     res.redirect(`${process.env.CLIENT_URL}/auth-error`);
   }
 };
+
+exports.guestLogin = async (req, res) => {
+  try {
+    const guestId = crypto.randomUUID ? crypto.randomUUID() : crypto.randomBytes(16).toString('hex');
+    const guestUser = await User.create({
+      username: `Guest_${guestId.substring(0, 8)}`,
+      email: `guest_${guestId}@draft16.local`,
+      isGuest: true
+    });
+
+    res.status(201).json({
+      token: generateToken(guestUser._id, guestUser.email),
+      user: {
+        id: guestUser._id,
+        username: guestUser.username,
+        email: guestUser.email,
+        isGuest: true
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
