@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="./client/public/favicon.png" alt="Draft16 Logo" width="120" height="120" />
+  <img src="./client/public/favicon.png?v=2" alt="Draft16 Logo" width="120" height="120" />
 
   # Draft16 Studio
 
