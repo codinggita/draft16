@@ -636,7 +636,7 @@ const SessionEditor = () => {
   const [bpm, setBpm] = useState(120);
   const [metronomeOn, setMetronomeOn] = useState(false);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
-  const [isRecordedTakesOpen, setIsRecordedTakesOpen] = useState(false);
+  const [isRecordedTakesOpen, setIsRecordedTakesOpen] = useState(true);
   const [isBottomSheetOpen, setIsBottomSheetOpen] = useState(false);
   
   const [isRecording, setIsRecording] = useState(false);
@@ -927,6 +927,7 @@ const SessionEditor = () => {
         
         // Add a temporary take to the UI with an uploading state
         setTakes((prev) => [...(Array.isArray(prev) ? prev : []), { _id: tempId, url: localUrl, name: defaultName, isUploading: true }]);
+        setIsRecordedTakesOpen(true);
         
         // Stop mic tracks so the browser recording indicator disappears
         stream.getTracks().forEach((track) => track.stop());
@@ -951,25 +952,27 @@ const SessionEditor = () => {
           // The final take to save — no _id so MongoDB generates a valid ObjectId
           const finalTake = { url: uploadedData.url, name: defaultName };
 
-          // Safely build new takes list, replacing temp placeholder
-          const safeTakes = Array.isArray(takes) ? takes : [];
-          const newTakes = [...safeTakes.filter(t => t._id !== tempId), finalTake];
-
-          // 1. Update UI optimistically
-          setTakes(newTakes);
-
-          // 2. Persist to backend (uses the pre-configured api instance, not raw axios)
-          try {
-            const res = await updateSession(id, { takes: newTakes });
-
-            if (res?.takes && Array.isArray(res.takes)) {
-              setTakes(res.takes); // Sync with DB-generated ObjectIDs
-            } else {
-              console.warn("Invalid takes response from DB, keeping local takes");
-            }
-          } catch (err) {
-            console.error("SAVE ERROR:", err);
-          }
+          // Ensure we update takes properly without trusting the closure's stale 'takes'
+          setTakes((currentTakes) => {
+            const safeTakes = Array.isArray(currentTakes) ? currentTakes : [];
+            const previousTakes = safeTakes.filter(t => t._id !== tempId);
+            const newTakes = [...previousTakes, finalTake];
+            
+            // 2. Persist to backend
+            updateSession(id, { takes: newTakes })
+              .then(res => {
+                if (res?.takes && Array.isArray(res.takes)) {
+                  setTakes(res.takes); // Sync with DB-generated ObjectIDs
+                } else {
+                  console.warn("Invalid takes response from DB, keeping local takes");
+                }
+              })
+              .catch(err => {
+                console.error("SAVE ERROR:", err);
+              });
+              
+            return newTakes;
+          });
         } catch (err) {
           console.error("UPLOAD ERROR:", err.response?.data || err);
           setTakes((prev) => prev.map(t => 
