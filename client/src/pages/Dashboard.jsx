@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { Link } from 'react-router-dom';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import SessionCard from '../components/SessionCard';
 import { getToken } from '../utils/auth';
 import useSessions from '../hooks/useSessions';
@@ -10,6 +10,7 @@ import { Search, Mic } from 'lucide-react';
 const Dashboard = () => {
   const navigate = useNavigate();
   const { sessions, sortedSessions, loading, error, query, setQuery, sortOption, setSortOption, removeSession } = useSessions();
+  const [sessionToDelete, setSessionToDelete] = useState(null);
 
   useEffect(() => {
     if (!getToken()) {
@@ -103,12 +104,62 @@ const Dashboard = () => {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6">
             {sortedSessions.map((session) => (
-              <SessionCard key={session._id} session={session} onDelete={removeSession} />
+              <SessionCard key={session._id} session={session} onDelete={() => setSessionToDelete(session)} />
             ))}
           </div>
         )}
 
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {sessionToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity" onClick={() => setSessionToDelete(null)} />
+          <div 
+            className="relative p-6 sm:p-8 w-full max-w-sm mx-4 shadow-2xl"
+            style={{ 
+              background: 'var(--bg-elevated)', 
+              border: '1px solid var(--bg-border)', 
+              borderRadius: '20px', 
+              animation: 'scaleUp 0.15s ease-out forwards' 
+            }}
+          >
+            <style>{`
+              @keyframes scaleUp {
+                from { transform: scale(0.95); opacity: 0; }
+                to { transform: scale(1); opacity: 1; }
+              }
+            `}</style>
+            <h3 className="text-xl font-display font-bold mb-2" style={{ color: 'var(--text-main)' }}>Delete Session</h3>
+            <p className="mb-6 text-sm" style={{ color: 'var(--text-muted)' }}>
+              Are you sure you want to delete "<span className="font-semibold" style={{ color: 'var(--text-main)' }}>{sessionToDelete.title}</span>"? This action cannot be undone.
+            </p>
+            <div className="flex gap-3 w-full">
+              <button 
+                onClick={() => setSessionToDelete(null)}
+                className="flex-1 py-2.5 rounded-xl font-medium transition-colors text-sm"
+                style={{ background: 'transparent', border: '1px solid var(--bg-border)', color: 'var(--text-muted)' }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-hover)'; e.currentTarget.style.color = 'var(--text-main)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-muted)'; }}
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={() => {
+                  removeSession(sessionToDelete._id);
+                  setSessionToDelete(null);
+                }}
+                className="flex-1 py-2.5 rounded-xl font-medium text-white transition-all shadow-sm text-sm"
+                style={{ background: '#ef4444' }}
+                onMouseEnter={(e) => e.currentTarget.style.background = '#dc2626'}
+                onMouseLeave={(e) => e.currentTarget.style.background = '#ef4444'}
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

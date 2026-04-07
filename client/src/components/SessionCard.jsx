@@ -3,9 +3,7 @@ import { Link } from 'react-router-dom';
 const SessionCard = ({ session, onDelete }) => {
 
   const handleDelete = () => {
-    if (window.confirm('Are you sure you want to delete this session?')) {
-      onDelete(session._id);
-    }
+    onDelete(session._id);
   };
   const formattedDate = new Date(session.createdAt).toLocaleDateString('en-US', {
     year: 'numeric',
