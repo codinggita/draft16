@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { createSession } from '../services/sessionService';
+import Dropdown from '../components/ui/Dropdown';
 
 const NewSession = () => {
   const navigate = useNavigate();
@@ -24,14 +25,12 @@ const NewSession = () => {
       
       const sessionData = {
         title,
-        lyrics: '', // Start empty
+        lyrics: '',
         beatSource,
         beatUrl
       };
 
       const newSession = await createSession(sessionData);
-      
-      // Redirect straight to the editor for this new session
       navigate(`/sessions/${newSession._id}`);
       
     } catch (err) {
@@ -41,66 +40,75 @@ const NewSession = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors flex items-center justify-center p-6">
-      <div className="bg-white dark:bg-gray-800 max-w-lg w-full rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-8 transition-colors">
+    <div className="flex justify-center items-center min-h-[calc(100vh-73px)] p-6 md:p-10" style={{ background: 'var(--bg-main)' }}>
+      <div className="w-full max-w-xl" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--bg-border)', borderRadius: '12px', padding: '40px' }}>
         
         <div className="mb-8">
-          <Link to="/dashboard" className="text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 text-sm font-medium mb-4 inline-block">
-            &larr; Back to Dashboard
+          <Link to="/dashboard" className="inline-flex items-center gap-1 text-sm font-semibold mb-6 hover:underline transition-colors" style={{ color: 'var(--accent-primary)' }}>
+            <span>&larr;</span> Back to Dashboard
           </Link>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Start New Session</h1>
-          <p className="text-gray-500 dark:text-gray-400 mt-1">Set up your workspace for a new track.</p>
+          <h1 className="font-display text-3xl font-bold tracking-tight mt-4" style={{ color: 'var(--text-main)' }}>Start New Session</h1>
+          <p className="mt-2" style={{ color: 'var(--text-muted)' }}>Set up your workspace for a new track.</p>
         </div>
 
         {error && (
-          <div className="bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 p-4 rounded-lg text-sm mb-6">
+          <div className="p-3 rounded-lg text-sm mb-6" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444' }}>
             {error}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleSubmit} className="space-y-6">
           
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Song Title *</label>
+            <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-muted)' }}>
+              Song Title <span style={{ color: '#ef4444' }}>*</span>
+            </label>
             <input
               type="text"
               required
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="e.g. Midnight Thoughts"
-              className="w-full p-3 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white dark:bg-gray-900 text-gray-900 dark:text-white transition-colors"
+              className="w-full p-3 rounded-lg outline-none transition-all"
+              style={{ background: 'var(--bg-main)', border: '1px solid var(--bg-border)', color: 'var(--text-main)' }}
+              onFocus={(e) => e.target.style.borderColor = 'var(--accent-primary)'}
+              onBlur={(e) => e.target.style.borderColor = 'var(--bg-border)'}
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Beat Source</label>
-            <select 
+            <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-muted)' }}>Beat Source</label>
+            <Dropdown
               value={beatSource}
-              onChange={(e) => setBeatSource(e.target.value)}
-              className="w-full p-3 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white dark:bg-gray-900 text-gray-900 dark:text-white transition-colors"
-            >
-              <option value="youtube">YouTube</option>
-              <option value="upload">Upload (Coming Soon)</option>
-              <option value="external">External Link</option>
-            </select>
+              onChange={(val) => setBeatSource(val)}
+              options={[
+                { value: 'youtube', label: 'YouTube' },
+                { value: 'upload', label: 'Upload (Coming Soon)' },
+                { value: 'external', label: 'External Link' }
+              ]}
+              className="w-full"
+            />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Beat URL (Optional)</label>
+            <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-muted)' }}>Beat URL (Optional)</label>
             <input
               type="url"
               value={beatUrl}
               onChange={(e) => setBeatUrl(e.target.value)}
               placeholder="https://youtube.com/..."
-              className="w-full p-3 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white dark:bg-gray-900 text-gray-900 dark:text-white transition-colors"
+              className="w-full p-3 rounded-lg outline-none transition-all"
+              style={{ background: 'var(--bg-main)', border: '1px solid var(--bg-border)', color: 'var(--text-main)' }}
+              onFocus={(e) => e.target.style.borderColor = 'var(--accent-primary)'}
+              onBlur={(e) => e.target.style.borderColor = 'var(--bg-border)'}
             />
           </div>
 
           <button
             type="submit"
             disabled={loading}
-            className={`w-full py-3 mt-4 rounded-lg font-medium text-white transition-colors
-              ${loading ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}
+            className="w-full py-3 mt-2 rounded-lg font-medium text-white transition-all text-base"
+            style={{ background: loading ? '#818cf8' : 'var(--accent-primary)', cursor: loading ? 'not-allowed' : 'pointer' }}
           >
             {loading ? 'Creating workspace...' : 'Create Session'}
           </button>
@@ -113,3 +121,4 @@ const NewSession = () => {
 };
 
 export default NewSession;
+

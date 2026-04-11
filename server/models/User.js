@@ -1,10 +1,13 @@
 const mongoose = require('mongoose');
 
 const userSchema = new mongoose.Schema({
-  username: { type: String, required: true },
+  username: { type: String }, // Made optional
+  name: { type: String },
   email: { type: String, required: true, unique: true },
-  password: { type: String, required: true },
-  themePreference: { type: String, default: 'dark' }
+  password: { type: String }, // Made optional for OAuth users
+  avatar: { type: String },
+  themePreference: { type: String, default: 'dark' },
+  isGuest: { type: Boolean, default: false }
 }, {
   timestamps: true
 });

@@ -9,3 +9,8 @@ export const signup = async (data) => {
   const response = await api.post('/auth/signup', data);
   return response.data;
 };
+
+export const guestLogin = async () => {
+  const response = await api.post('/auth/guest');
+  return response.data;
+};

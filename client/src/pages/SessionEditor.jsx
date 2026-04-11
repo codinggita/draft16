@@ -1,10 +1,15 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import { getSessionById, updateSession } from '../services/sessionService';
 import { uploadAudio } from '../services/uploadService';
 import { getRhymes } from '../services/rhymeService';
 import BeatPlayer from '../components/BeatPlayer';
+import YouTubePlayer from '../components/YouTubePlayer';
+import Dropdown from '../components/ui/Dropdown';
+import BpmInput from '../components/ui/BpmInput';
 import { startMetronome } from '../utils/metronome';
+import { getUserFromToken } from '../utils/auth';
 import CodeMirror from '@uiw/react-codemirror';
 import { ViewPlugin, Decoration, EditorView, WidgetType, placeholder } from '@codemirror/view';
 import { RangeSetBuilder } from '@codemirror/state';
@@ -13,6 +18,7 @@ import { rhymeSchemePlugin } from '../editor/plugins/rhymeSchemePlugin';
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, useSortable, arrayMove, horizontalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { Mic2 } from 'lucide-react';
 
 // CodeMirror Extension for highlighting [Section Headers]
 export const getSectionHeaderPlugin = (activeType) => ViewPlugin.fromClass(
@@ -259,6 +265,240 @@ export const rhymePlugin = ViewPlugin.fromClass(
   }
 );
 
+const TakeCard = ({ take, index, editingTakeId, editingTakeName, setEditingTakeName, handleRenameTakeSubmit, setEditingTakeId, handlePlayTakeSync, onDelete }) => {
+  const takeIdentifier = take._id || take.id;
+  const audioRef = useRef(null);
+  const [progress, setProgress] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    const updateProgress = () => {
+      if (audio.duration) {
+        setProgress((audio.currentTime / audio.duration) * 100);
+        setCurrentTime(audio.currentTime);
+      }
+    };
+
+    const updateDuration = () => {
+      if (audio.duration) {
+        setDuration(audio.duration);
+      }
+    };
+    
+    const handlePlay = () => setIsPlaying(true);
+    const handlePause = () => setIsPlaying(false);
+    const handleEnded = () => {
+      setIsPlaying(false);
+      setProgress(0);
+      setCurrentTime(0);
+    };
+
+    audio.addEventListener('timeupdate', updateProgress);
+    audio.addEventListener('loadedmetadata', updateDuration);
+    audio.addEventListener('play', handlePlay);
+    audio.addEventListener('pause', handlePause);
+    audio.addEventListener('ended', handleEnded);
+
+    // Initial check if already loaded
+    if (audio.readyState > 0) {
+      updateDuration();
+    }
+
+    return () => {
+      audio.removeEventListener('timeupdate', updateProgress);
+      audio.removeEventListener('loadedmetadata', updateDuration);
+      audio.removeEventListener('play', handlePlay);
+      audio.removeEventListener('pause', handlePause);
+      audio.removeEventListener('ended', handleEnded);
+    };
+  }, []);
+
+  const togglePlay = () => {
+    if (audioRef.current.paused) {
+      handlePlayTakeSync(takeIdentifier);
+    } else {
+      audioRef.current.pause();
+    }
+  };
+
+  const formatTime = (time) => {
+    if (isNaN(time) || time === Infinity || time == null) return '0:00';
+    const mins = Math.floor(time / 60);
+    const secs = Math.floor(time % 60);
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+  };
+
+  return (
+    <div className="group" style={{ 
+      display: 'flex', 
+      alignItems: 'center', 
+      gap: '12px', 
+      padding: '20px 24px', 
+      borderRadius: '12px', 
+      background: isPlaying ? 'var(--take-bg-playing)' : 'var(--take-bg)', 
+      border: '1px solid var(--take-border)', 
+      borderLeft: isPlaying ? '4px solid var(--accent-primary)' : '1px solid var(--take-border)',
+      marginBottom: '10px',
+      position: 'relative',
+      transition: 'all 0.2s ease',
+      transform: 'translateY(0)',
+      boxShadow: 'none'
+    }}
+    onMouseEnter={(e) => {
+      if (!isPlaying) e.currentTarget.style.background = 'var(--take-bg-hover)';
+      e.currentTarget.style.transform = 'translateY(-1px)';
+      e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.06)';
+    }}
+    onMouseLeave={(e) => {
+      if (!isPlaying) e.currentTarget.style.background = 'var(--take-bg)';
+      e.currentTarget.style.transform = 'translateY(0)';
+      e.currentTarget.style.boxShadow = 'none';
+    }}>
+      
+      {/* Hidden Audio for playback engine */}
+      <audio ref={audioRef} data-take-id={takeIdentifier} src={take.url} className="hidden" preload="metadata" />
+
+      {/* Play Button */}
+      <button
+        onClick={togglePlay}
+        className="shrink-0 flex items-center justify-center transition-all"
+        style={{ 
+          width: '38px', height: '38px', borderRadius: '50%', 
+          background: isPlaying ? 'var(--accent-primary)' : 'var(--take-btn-bg)', 
+          color: isPlaying ? '#ffffff' : 'var(--take-text)',
+          transform: 'scale(1)'
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.transform = 'scale(1.05)';
+          if (!isPlaying) e.currentTarget.style.background = 'var(--take-btn-hover)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.transform = 'scale(1)';
+          if (!isPlaying) e.currentTarget.style.background = 'var(--take-btn-bg)';
+        }}
+        onMouseDown={(e) => e.currentTarget.style.transform = 'scale(0.95)'}
+        onMouseUp={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
+      >
+        {isPlaying ? (
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
+        ) : (
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: '2px' }}><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+        )}
+      </button>
+      
+      {/* Content Area */}
+      <div className="flex flex-col flex-1 overflow-hidden" style={{ gap: '8px' }}>
+        
+        {/* ROW 1: Title & Info */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            {editingTakeId === takeIdentifier ? (
+              <input
+                autoFocus
+                type="text"
+                value={editingTakeName}
+                onChange={(e) => setEditingTakeName(e.target.value)}
+                onBlur={() => handleRenameTakeSubmit(takeIdentifier)}
+                onFocus={(e) => e.target.select()}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleRenameTakeSubmit(takeIdentifier);
+                  if (e.key === 'Escape') setEditingTakeId(null);
+                }}
+                className="font-medium bg-transparent outline-none w-full max-w-[200px]"
+                style={{ fontSize: '14px', color: 'var(--take-text)', borderBottom: '1px solid var(--take-time)' }}
+              />
+            ) : (
+              <span 
+                className="truncate cursor-text transition-colors duration-200"
+                style={{ fontWeight: 500, fontSize: '14px', color: 'var(--take-text)' }}
+                onClick={() => {
+                  setEditingTakeId(takeIdentifier);
+                  setEditingTakeName(take.name || `Take ${index + 1}`);
+                }}
+                title="Click to rename"
+              >
+                {take.name || `Take ${index + 1}`}
+              </span>
+            )}
+
+            {take.isUploading && (
+               <span className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest animate-pulse ml-2">Uploading...</span>
+            )}
+            {take.error && (
+               <span className="text-[10px] font-bold text-red-500 uppercase tracking-widest ml-2">Failed</span>
+            )}
+          </div>
+
+          <div className="flex items-center gap-3">
+            {/* Time Display */}
+            <span style={{ fontSize: '12px', color: 'var(--take-time)', fontVariantNumeric: 'tabular-nums' }}>
+              {formatTime(currentTime)} / {formatTime(duration)}
+            </span>
+
+            {/* Controls (Delete) */}
+            <button
+              onClick={() => onDelete(takeIdentifier)}
+              className="w-7 h-7 flex justify-center items-center transition-all"
+              style={{ color: '#ef4444', opacity: 0.7, background: 'transparent', borderRadius: '6px' }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.opacity = 1;
+                e.currentTarget.style.background = 'rgba(239,68,68,0.12)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.opacity = 0.7;
+                e.currentTarget.style.background = 'transparent';
+              }}
+              onMouseDown={(e) => {
+                e.currentTarget.style.background = 'rgba(239,68,68,0.18)';
+              }}
+              onMouseUp={(e) => {
+                e.currentTarget.style.background = 'rgba(239,68,68,0.12)';
+              }}
+              title="Delete take"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+            </button>
+          </div>
+        </div>
+
+        {/* ROW 2: Timeline */}
+        <div 
+          className="w-full rounded-full cursor-pointer relative" 
+          style={{ height: '5px', background: 'var(--take-progress-bg)' }} 
+          onClick={(e) => {
+            if (!audioRef.current || !audioRef.current.duration) return;
+            const rect = e.currentTarget.getBoundingClientRect();
+            const percent = (e.clientX - rect.left) / rect.width;
+            audioRef.current.currentTime = percent * audioRef.current.duration;
+          }}
+          onMouseEnter={(e) => {
+             const track = e.currentTarget.querySelector('.track-fill');
+             if(track) track.style.filter = 'brightness(1.1)';
+             const thumb = e.currentTarget.querySelector('.thumb');
+             if(thumb) thumb.style.opacity = '1';
+          }}
+          onMouseLeave={(e) => {
+             const track = e.currentTarget.querySelector('.track-fill');
+             if(track) track.style.filter = 'brightness(1)';
+             const thumb = e.currentTarget.querySelector('.thumb');
+             if(thumb) thumb.style.opacity = '0';
+          }}
+        >
+          <div className="h-full rounded-full transition-all duration-100 ease-linear track-fill flex justify-end items-center" style={{ width: `${progress}%`, background: 'var(--accent-primary)' }}>
+            <div className="thumb transition-opacity duration-200" style={{ width: '9px', height: '9px', background: 'var(--accent-primary)', borderRadius: '50%', transform: 'translateX(4px)', opacity: 0 }}></div>
+          </div>
+        </div>
+        
+      </div>
+    </div>
+  );
+};
+
 const SortableTab = ({ draft, idx, id, activeDraftIndex, setActiveDraftIndex, onRename, onDelete }) => {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id });
   const style = { transform: CSS.Transform.toString(transform), transition };
@@ -300,20 +540,41 @@ const SortableTab = ({ draft, idx, id, activeDraftIndex, setActiveDraftIndex, on
   };
 
   return (
-    // {...listeners} is on the whole div, but PointerSensor requires 8px movement
-    // to activate a drag — so plain clicks reach onClick without interference.
     <div
       ref={setNodeRef}
-      style={style}
+      style={{
+        ...style,
+        // Active tab: visually connected to editor
+        background: isActive ? 'var(--editor-bg-solid)' : 'transparent',
+        border: isActive ? '1px solid var(--editor-border)' : '1px solid transparent',
+        borderBottom: isActive ? 'none' : '1px solid transparent',
+        borderRadius: isActive ? '10px 10px 0 0' : '6px',
+        boxShadow: isActive ? 'var(--tab-active-shadow)' : 'none',
+        color: isActive ? 'var(--tab-active)' : 'var(--tab-inactive)',
+        opacity: 1,
+        fontWeight: isActive ? 600 : 400,
+        position: 'relative',
+        zIndex: isActive ? 2 : 1,
+        marginBottom: '0',
+        transition: 'all 0.2s ease',
+      }}
       {...attributes}
       {...listeners}
       onClick={() => setActiveDraftIndex(idx)}
       onDoubleClick={handleDoubleClick}
-      className={`group flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors cursor-grab active:cursor-grabbing border select-none relative shrink-0
-        ${isActive 
-          ? 'bg-white dark:bg-gray-900 border-t-gray-200 border-l-gray-200 border-r-gray-200 border-b-white dark:border-t-gray-700 dark:border-l-gray-700 dark:border-r-gray-700 dark:border-b-gray-900 rounded-t-lg text-blue-600 dark:text-blue-400 -mb-px z-10' 
-          : 'bg-gray-100 dark:bg-gray-800 border-transparent border-b-transparent text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-t-lg z-0 mb-0'
-        }`}
+      onMouseEnter={(e) => {
+        if (!isActive) {
+          e.currentTarget.style.color = 'var(--tab-hover)';
+          e.currentTarget.style.background = 'var(--tab-hover-bg)';
+        }
+      }}
+      onMouseLeave={(e) => {
+        if (!isActive) {
+          e.currentTarget.style.color = 'var(--tab-inactive)';
+          e.currentTarget.style.background = 'transparent';
+        }
+      }}
+      className="group flex items-center gap-2 px-4 py-2.5 text-sm select-none shrink-0 cursor-grab active:cursor-grabbing"
     >
       {isEditing ? (
         <input
@@ -322,15 +583,16 @@ const SortableTab = ({ draft, idx, id, activeDraftIndex, setActiveDraftIndex, on
           onChange={(e) => setEditName(e.target.value)}
           onKeyDown={handleKeyDown}
           onBlur={handleBlur}
-          className="bg-transparent border-b border-blue-500 outline-none min-w-[60px] max-w-[120px] px-1"
-          onPointerDown={(e) => e.stopPropagation()} 
+          className="bg-transparent outline-none min-w-[60px] max-w-[120px] px-1"
+          style={{ borderBottom: '1px solid var(--accent-primary)', color: 'var(--text-main)' }}
+          onPointerDown={(e) => e.stopPropagation()}
         />
       ) : (
-        <span title={idx !== 0 ? "Double click to rename" : ""}>
+        <span title={idx !== 0 ? 'Double click to rename' : ''}>
           {draft.name}
         </span>
       )}
-      
+
       {idx !== 0 && (
         <button
           onPointerDown={(e) => e.stopPropagation()}
@@ -338,7 +600,10 @@ const SortableTab = ({ draft, idx, id, activeDraftIndex, setActiveDraftIndex, on
             e.stopPropagation();
             onDelete(idx);
           }}
-          className="text-gray-400 hover:text-red-500 ml-1 opacity-0 group-hover:opacity-100 transition-opacity focus:outline-none"
+          className="h-4 w-4 flex items-center justify-center rounded-full ml-0.5 opacity-0 group-hover:opacity-100 transition-all focus:outline-none"
+          style={{ color: '#9ca3af' }}
+          onMouseEnter={(e) => { e.currentTarget.style.color = '#ef4444'; e.currentTarget.style.background = 'rgba(239,68,68,0.1)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = '#9ca3af'; e.currentTarget.style.background = 'transparent'; }}
         >
           &times;
         </button>
@@ -351,6 +616,9 @@ const SortableTab = ({ draft, idx, id, activeDraftIndex, setActiveDraftIndex, on
 const SessionEditor = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+
+  const userPayload = useMemo(() => getUserFromToken(), []);
+  const isGuest = userPayload?.isGuest || false;
 
   // dnd-kit sensor with distance constraint:
   // pointer must move >=8px before drag activates, so plain taps/clicks bubble normally.
@@ -367,6 +635,9 @@ const SessionEditor = () => {
   const [beatUrl, setBeatUrl] = useState('');
   const [bpm, setBpm] = useState(120);
   const [metronomeOn, setMetronomeOn] = useState(false);
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+  const [isRecordedTakesOpen, setIsRecordedTakesOpen] = useState(true);
+  const [isBottomSheetOpen, setIsBottomSheetOpen] = useState(false);
   
   const [isRecording, setIsRecording] = useState(false);
   const [takes, setTakes] = useState([]);
@@ -376,6 +647,8 @@ const SessionEditor = () => {
   const [markers, setMarkers] = useState([]);
   const [newMarkerTime, setNewMarkerTime] = useState('');
   const [newMarkerLabel, setNewMarkerLabel] = useState('');
+  const [isFocusMode, setIsFocusMode] = useState(false);
+  const [textAlign, setTextAlign] = useState('left');
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -546,12 +819,12 @@ const SessionEditor = () => {
     }, 3000);
 
     return () => clearTimeout(autoSaveTimer.current);
-  }, [drafts, title, beatSource, beatUrl, markers, bpm, takes]);
+  }, [drafts, title, beatSource, beatUrl, markers, bpm]);
 
   const autoSaveSession = async () => {
     try {
       setIsSaving(true);
-      await updateSession(id, { title, drafts, beatSource, beatUrl, markers, bpm, takes });
+      await updateSession(id, { title, drafts, beatSource, beatUrl, markers, bpm });
       setIsSaving(false);
       setLastSaved(true);
     } catch {
@@ -572,21 +845,18 @@ const SessionEditor = () => {
     }
   };
 
-  const handleFileUpload = async (e) => {
+  const handleFileUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
-    try {
-      setIsUploading(true);
-      setError(null);
-      const data = await uploadAudio(file);
-      setBeatUrl(data.url);
-      setBeatSource('upload');
-    } catch (err) {
-      setError(err.response?.data?.message || 'Error uploading file');
-    } finally {
-      setIsUploading(false);
+    // Revoke previous object URL to free memory
+    if (beatUrl && beatSource === 'upload' && beatUrl.startsWith('blob:')) {
+      URL.revokeObjectURL(beatUrl);
     }
+
+    const localUrl = URL.createObjectURL(file);
+    setBeatUrl(localUrl);
+    setBeatSource('upload');
   };
 
   const startRecording = async () => {
@@ -655,7 +925,9 @@ const SessionEditor = () => {
         const tempId = Date.now().toString();
         const defaultName = `Take ${takes.length + 1}`;
         
-        setTakes((prev) => [...prev, { _id: tempId, url: localUrl, name: defaultName, isUploading: true }]);
+        // Add a temporary take to the UI with an uploading state
+        setTakes((prev) => [...(Array.isArray(prev) ? prev : []), { _id: tempId, url: localUrl, name: defaultName, isUploading: true }]);
+        setIsRecordedTakesOpen(true);
         
         // Stop mic tracks so the browser recording indicator disappears
         stream.getTracks().forEach((track) => track.stop());
@@ -677,9 +949,30 @@ const SessionEditor = () => {
           const uploadedData = await uploadAudio(file);
           console.log("UPLOAD SUCCESS:", uploadedData);
           
-          setTakes((prev) => prev.map(t => 
-             t._id === tempId ? { _id: tempId, url: uploadedData.url, name: defaultName } : t
-          ));
+          // The final take to save — no _id so MongoDB generates a valid ObjectId
+          const finalTake = { url: uploadedData.url, name: defaultName };
+
+          // Ensure we update takes properly without trusting the closure's stale 'takes'
+          setTakes((currentTakes) => {
+            const safeTakes = Array.isArray(currentTakes) ? currentTakes : [];
+            const previousTakes = safeTakes.filter(t => t._id !== tempId);
+            const newTakes = [...previousTakes, finalTake];
+            
+            // 2. Persist to backend
+            updateSession(id, { takes: newTakes })
+              .then(res => {
+                if (res?.takes && Array.isArray(res.takes)) {
+                  setTakes(res.takes); // Sync with DB-generated ObjectIDs
+                } else {
+                  console.warn("Invalid takes response from DB, keeping local takes");
+                }
+              })
+              .catch(err => {
+                console.error("SAVE ERROR:", err);
+              });
+              
+            return newTakes;
+          });
         } catch (err) {
           console.error("UPLOAD ERROR:", err.response?.data || err);
           setTakes((prev) => prev.map(t => 
@@ -701,8 +994,15 @@ const SessionEditor = () => {
         }
       }
     } catch (error) {
-      console.error("Recording error:", error);
-      alert("Microphone access denied or not available.");
+      if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+        setError('Microphone access was denied. Please allow mic access in your browser settings and try again.');
+      } else if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
+        setError('No microphone found. Please connect a microphone and try again.');
+      } else if (!navigator.mediaDevices || !window.isSecureContext) {
+        setError('Recording requires a secure connection (HTTPS). Please access the app over HTTPS.');
+      } else {
+        setError('Could not start recording. Please check your microphone and try again.');
+      }
     }
   };
 
@@ -861,36 +1161,65 @@ const SessionEditor = () => {
     }
   };
 
-  if (loading) return <div className="p-8 text-center text-gray-500">Loading session...</div>;
-  if (error) return <div className="p-8 text-center text-red-500">{error}</div>;
+  if (loading) return (
+    <div className="min-h-[calc(100vh-73px)] flex justify-center items-center">
+       <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500"></div>
+    </div>
+  );
+  if (error) return (
+    <div className="min-h-[calc(100vh-73px)] flex justify-center items-center text-red-500 font-medium">{error}</div>
+  );
 
   // Mark first load complete after initial data is populated
   if (!loading && isFirstLoad.current) isFirstLoad.current = false;
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors p-6 md:p-10">
-      <div className="max-w-6xl mx-auto space-y-6">
+    <div className="min-h-[calc(100vh-73px)] px-2 py-4 md:p-8 w-full max-w-full transition-all duration-200 ease-in-out" style={{ background: 'var(--bg-main)' }}>
+      {isFocusMode && <style>{`nav { display: none !important; }`}</style>}
+      <div className={`max-w-[1500px] w-full max-w-full mx-auto relative z-10 transition-all duration-200 ease-in-out ${isFocusMode ? 'space-y-0' : 'space-y-4 md:space-y-6'}`}>
         
-        {/* Header Actions */}
-        <div className="flex justify-between items-center bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 transition-colors">
-          <button 
-            onClick={() => navigate('/dashboard')}
-            className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 font-medium"
-          >
-            &larr; Back to Dashboard
-          </button>
+        {/* Minimal Focus Header has been removed per instructions to keep standard UI */}
+
+
+        <div className="flex justify-between items-center p-4 rounded-lg mb-2 transition-colors" style={{ background: 'var(--bg-surface)', border: '1px solid var(--bg-border)' }}>
+          <div className="flex items-center gap-2 sm:gap-4">
+            {!isFocusMode && (
+              <button
+                onClick={() => setIsMobileNavOpen(true)}
+                className="lg:hidden p-2 -ml-2 rounded-lg transition-colors"
+                style={{ color: 'var(--text-muted)' }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text-main)'; e.currentTarget.style.background = 'var(--bg-hover)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.background = 'transparent'; }}
+                title="Open Navigator"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+              </button>
+            )}
+            <button 
+              onClick={() => navigate('/dashboard')}
+              className="font-semibold transition-colors flex items-center gap-2 text-sm"
+              style={{ color: 'var(--text-muted)' }}
+              onMouseEnter={(e) => e.currentTarget.style.color = 'var(--text-main)'}
+              onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-muted)'}
+            >
+              <span>&larr;</span> Dashboard
+            </button>
+          </div>
           <div className="flex items-center gap-3">
             <button
               onClick={exportLyrics}
-              className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded transition-colors"
+              className="px-4 py-2 rounded-lg transition-all text-sm font-medium hidden sm:block"
+              style={{ background: 'transparent', border: '1px solid var(--bg-border)', color: 'var(--text-muted)' }}
+              onMouseEnter={(e) => e.currentTarget.style.color = 'var(--text-main)'}
+              onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-muted)'}
             >
-              Export Lyrics
+              Export TXT
             </button>
             <button 
               onClick={handleSave}
               disabled={saving}
-              className={`px-6 py-2 rounded-lg font-medium text-white transition-colors
-                ${saving ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}
+              className="px-5 py-2 rounded-lg font-bold text-white transition-all text-sm"
+              style={{ background: saving ? 'var(--accent-hover)' : 'var(--accent-primary)', cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1 }}
             >
               {saving ? 'Saving...' : 'Save Session'}
             </button>
@@ -898,47 +1227,48 @@ const SessionEditor = () => {
         </div>
 
         {/* Editor Main Content */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden transition-colors">
+        <div className={`rounded-xl overflow-hidden transition-all duration-200 ease-in-out`} style={{ background: isFocusMode ? 'var(--bg-main)' : 'var(--bg-surface)', border: isFocusMode ? 'none' : '1px solid var(--bg-border)', boxShadow: isFocusMode ? 'none' : 'var(--shadow-soft)' }}>
           
           {/* Top Controls (Title & Beat) */}
-          <div className="p-6 border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50 space-y-4 transition-colors">
+          <div className="px-6 md:px-8 py-4 space-y-4 transition-colors" style={{ background: 'var(--bg-elevated)', borderBottom: '1px solid var(--bg-border)' }}>
             
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Session Title</label>
+              <label className="block text-xs font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>Session Title</label>
               <input
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="Name your track..."
-                className="w-full text-2xl font-bold p-3 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white dark:bg-gray-900 text-gray-900 dark:text-white transition-all"
+                className="w-full text-2xl sm:text-3xl md:text-4xl font-display font-extrabold p-0 bg-transparent outline-none placeholder-slate-500 transition-all border-none focus:ring-0 truncate"
+                style={{ color: 'var(--brand-dark)' }}
               />
             </div>
 
-            <div className="grid md:grid-cols-3 gap-4">
+            <div className="flex flex-col md:grid md:grid-cols-3 gap-2 md:gap-4">
               <div className="md:col-span-1">
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Beat Source</label>
-                <select 
+                <Dropdown
                   value={beatSource}
-                  onChange={(e) => setBeatSource(e.target.value)}
-                  className="w-full p-3 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white dark:bg-gray-900 text-gray-900 dark:text-white transition-colors"
-                >
-                  <option value="youtube">YouTube</option>
-                  <option value="upload">Upload (Coming Soon)</option>
-                  <option value="external">External Link</option>
-                </select>
+                  onChange={(val) => setBeatSource(val)}
+                  options={[
+                    { value: 'youtube', label: 'YouTube' },
+                    { value: 'upload', label: 'Upload Audio' },
+                    { value: 'external', label: 'External Link' }
+                  ]}
+                  className="w-full"
+                />
               </div>
               <div className="md:col-span-2">
                 {beatSource === 'upload' ? (
                   <>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      {isUploading ? 'Uploading...' : 'Upload Beat (MP3/WAV)'}
+                      Upload Beat
                     </label>
                     <input
                       type="file"
-                      accept=".mp3,.wav"
+                      accept="audio/*"
                       onChange={handleFileUpload}
-                      disabled={isUploading}
-                      className="w-full p-2 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white dark:bg-gray-900 text-gray-900 dark:text-white transition-colors file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 dark:file:bg-gray-800 dark:file:text-blue-400"
+                      className="w-full p-2 rounded-lg outline-none transition-colors custom-input file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700"
                     />
                   </>
                 ) : (
@@ -949,49 +1279,48 @@ const SessionEditor = () => {
                       value={beatUrl}
                       onChange={(e) => setBeatUrl(e.target.value)}
                       placeholder="Paste link here..."
-                      className="w-full p-3 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white dark:bg-gray-900 text-gray-900 dark:text-white transition-colors"
+                      className="w-full p-3 rounded-lg outline-none transition-colors custom-input"
                     />
                   </>
                 )}
               </div>
             </div>
 
-            {beatSource === 'youtube' && <BeatPlayer ref={beatPlayerRef} beatSource={beatSource} beatUrl={beatUrl} />}
-            {beatSource === 'upload' && beatUrl && (
-              <audio ref={beatPlayerRef} controls src={beatUrl} className="w-full h-12 rounded-lg outline-none mt-2" />
+            {/* Audio file sources → HTMLAudioElement via BeatPlayer */}
+            {(beatSource === 'upload' || beatSource === 'external') && beatUrl && (
+              <BeatPlayer ref={beatPlayerRef} beatUrl={beatUrl} beatSource={beatSource} />
+            )}
+
+            {/* YouTube sources → iframe embed, never HTMLAudioElement */}
+            {beatSource === 'youtube' && beatUrl && (
+              <YouTubePlayer url={beatUrl} />
             )}
 
             <div className="flex items-center justify-start gap-4 mt-2">
-              <div className="flex items-center gap-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 px-3 py-1.5 rounded-lg shadow-sm">
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">BPM</label>
-                <input 
-                  type="number"
-                  value={bpm}
-                  min="40"
-                  max="220"
-                  onChange={(e) => setBpm(Number(e.target.value))}
-                  className="w-16 p-1 text-center bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-gray-900 dark:text-white outline-none focus:ring-1 focus:ring-blue-500 font-mono text-sm"
-                />
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all duration-200" style={{ background: 'var(--bg-surface)', border: '1px solid var(--bg-border)', boxShadow: 'var(--shadow-soft)' }}>
+                <label className="text-sm font-medium transition-colors" style={{ color: 'var(--accent-primary)' }}>BPM</label>
+                <BpmInput bpm={bpm} setBpm={setBpm} />
               </div>
               <button
                 onClick={() => setMetronomeOn(!metronomeOn)}
-                className={`flex items-center gap-2 px-4 py-1.5 text-sm font-medium rounded-lg shadow-sm transition-colors border ${
-                  metronomeOn 
-                    ? 'bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800' 
-                    : 'bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800'
-                }`}
+                className="flex items-center gap-2 px-4 py-1.5 text-sm font-medium rounded-lg shadow-sm transition-colors border"
+                style={{
+                  background: metronomeOn ? 'var(--accent-primary)' : 'transparent',
+                  color: metronomeOn ? '#fff' : 'var(--text-muted)',
+                  borderColor: metronomeOn ? 'var(--accent-primary)' : 'var(--bg-border)',
+                }}
               >
                 {metronomeOn ? (
                   <>
                     <span className="relative flex h-2 w-2">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
                     </span>
                     Metronome ON
                   </>
                 ) : (
                   <>
-                    <span className="h-2 w-2 rounded-full bg-gray-300 dark:bg-gray-600"></span>
+                    <span className="h-2 w-2 rounded-full" style={{ background: 'var(--text-muted)' }}></span>
                     Metronome OFF
                   </>
                 )}
@@ -1001,41 +1330,80 @@ const SessionEditor = () => {
           </div>
 
           {/* Lyrics Editor (Workspace) */}
-          <div className="p-6 flex flex-col md:grid md:grid-cols-[220px_1fr] gap-6">
+          <div className={`px-2 py-4 sm:p-4 md:p-8 flex flex-col gap-4 md:gap-8 relative transition-all duration-200 ease-in-out ${!isFocusMode ? 'lg:grid lg:grid-cols-[260px_1fr]' : ''}`} style={{ padding: isFocusMode ? '0' : '' }}>
             
-            {/* Section Navigator (Left Column on Desktop, Top on Mobile) */}
-            <div className="md:border-r border-gray-100 dark:border-gray-700 md:pr-4 flex flex-col gap-2">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Navigator</label>
+            {/* Section Navigator */}
+            {!isFocusMode && (
+              <>
+                {/* Mobile Drawer Backdrop */}
+                {isMobileNavOpen && (
+                  <div 
+                    className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm lg:hidden"
+                    onClick={() => setIsMobileNavOpen(false)}
+                  />
+                )}
+                
+                {/* Navigator Container */}
+                <div 
+                  className={`
+                    fixed lg:static inset-y-0 left-0 z-50 w-[280px] lg:w-full h-full lg:h-auto
+                    bg-[var(--bg-main)] lg:bg-transparent border-r border-[var(--bg-border)] lg:border-none
+                    p-6 lg:p-0 flex flex-col gap-1 transition-transform duration-300 ease-in-out
+                    ${isMobileNavOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+                    lg:pr-4 shadow-xl lg:shadow-none
+                  `}
+                >
+                  <div className="flex justify-between items-center mb-4 lg:mb-2" style={{ color: 'var(--nav-heading)' }}>
+                    <label className="block text-xs font-bold uppercase tracking-wider">Navigator</label>
+                    <button className="lg:hidden p-1.5 -mr-1.5 rounded text-[var(--text-muted)] hover:bg-[var(--bg-hover)]" onClick={() => setIsMobileNavOpen(false)}>
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"></path></svg>
+                    </button>
+                  </div>
               
-              <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1 mt-2">Sections</div>
-              <div className="overflow-y-auto space-y-1 mb-4 max-h-40">
+              <div className="text-[10px] font-bold uppercase tracking-widest mb-1 mt-2" style={{ color: 'var(--nav-heading)' }}>Sections</div>
+              <div className="overflow-y-auto space-y-1.5 mb-6 max-h-[30vh]">
                 {parsedSections.map(section => (
                   <button
                     key={section.id}
                     onClick={() => navigateToSection(section.type)}
-                    className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                      activeSectionId === section.id 
-                        ? 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white' 
-                        : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
-                    }`}
+                    className="w-full text-left px-4 py-2.5 rounded-xl text-sm transition-all border border-transparent"
+                    style={{
+                      color: activeSectionId === section.id ? 'var(--nav-active)' : 'var(--nav-item)',
+                      fontWeight: activeSectionId === section.id ? '600' : 'normal',
+                      background: activeSectionId === section.id ? 'var(--bg-hover)' : 'transparent',
+                      boxShadow: activeSectionId === section.id ? 'var(--accent-glow)' : 'none'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (activeSectionId !== section.id) {
+                         e.currentTarget.style.background = 'var(--bg-hover)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (activeSectionId !== section.id) {
+                         e.currentTarget.style.background = 'transparent';
+                      }
+                    }}
                   >
                     {section.type}
                   </button>
                 ))}
                 {parsedSections.length === 0 && (
-                  <div className="text-gray-400 text-sm italic px-2">No sections added yet.</div>
+                  <div className="text-sm italic px-2" style={{ color: 'var(--text-muted)' }}>No sections added yet.</div>
                 )}
               </div>
 
-              <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1 mt-2">Beat Markers</div>
-              <div className="overflow-y-auto space-y-1 mb-2 max-h-40">
+              <div className="text-[10px] font-bold uppercase tracking-widest mb-1 mt-2" style={{ color: 'var(--nav-heading)' }}>Beat Markers</div>
+              <div className="overflow-y-auto space-y-1.5 mb-3 max-h-[30vh]">
                 {markers.map((marker, index) => (
                   <div
                     key={index}
-                    className="group flex justify-between items-center w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
+                    className="group flex justify-between items-center w-full text-left px-4 py-2.5 rounded-xl text-sm transition-all border border-transparent"
+                    style={{ color: 'var(--text-main)', background: 'transparent' }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-hover)'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
                   >
-                    <span className="cursor-pointer text-gray-600 dark:text-gray-400" onClick={() => navigateToSection(marker.label, marker.time)}>
-                      <span className="text-blue-500 mr-2">[{formatTime(marker.time)}]</span>
+                    <span className="cursor-pointer transition-colors" onClick={() => navigateToSection(marker.label, marker.time)}>
+                      <span className="mr-2" style={{ color: 'var(--accent-primary)' }}>[{formatTime(marker.time)}]</span>
                       {marker.label}
                     </span>
                     <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -1069,33 +1437,36 @@ const SessionEditor = () => {
                 )}
               </div>
               
-              <form onSubmit={handleAddMarker} className="flex gap-2 items-center text-sm px-1 mb-4">
-                <input 
-                  type="text" 
-                  value={newMarkerTime}
-                  onChange={(e) => setNewMarkerTime(e.target.value)}
-                  placeholder="0:00" 
-                  className="w-16 p-1 border border-gray-200 dark:border-gray-700 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white outline-none focus:ring-1 focus:ring-blue-500"
-                />
-                <input 
-                  type="text" 
-                  value={newMarkerLabel}
-                  onChange={(e) => setNewMarkerLabel(e.target.value)}
-                  placeholder="Label" 
-                  className="flex-1 p-1 border border-gray-200 dark:border-gray-700 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white outline-none focus:ring-1 focus:ring-blue-500 min-w-0"
-                />
-                <button type="submit" className="bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-400 px-2 py-1 rounded hover:bg-blue-200 dark:hover:bg-blue-800/80 transition-colors">
-                  +
-                </button>
+              <form onSubmit={handleAddMarker} className="flex gap-2 items-center text-sm mb-6">
+                <div className="flex bg-white/50 dark:bg-slate-900/50 border border-slate-200/50 dark:border-white/10 rounded-xl p-1 shadow-inner w-full flex-1 transition-all focus-within:ring-2 focus-within:ring-green-500/30 focus-within:border-green-500/50">
+                  <input 
+                    type="text" 
+                    value={newMarkerTime}
+                    onChange={(e) => setNewMarkerTime(e.target.value)}
+                    placeholder="0:00" 
+                    className="w-16 p-1.5 text-center bg-transparent text-slate-900 dark:text-white outline-none focus:ring-0 font-mono text-xs placeholder-slate-400 border-none"
+                  />
+                  <div className="w-px bg-slate-200 dark:bg-white/10 mx-1"></div>
+                  <input 
+                    type="text" 
+                    value={newMarkerLabel}
+                    onChange={(e) => setNewMarkerLabel(e.target.value)}
+                    placeholder="Label" 
+                    className="flex-1 p-1.5 bg-transparent text-slate-900 dark:text-white outline-none focus:ring-0 min-w-0 text-xs placeholder-slate-400 border-none"
+                  />
+                  <button type="submit" className="bg-indigo-500 hover:bg-indigo-600 text-white px-3 py-1.5 rounded-lg transition-colors ml-1 shadow-sm font-bold">
+                    +
+                  </button>
+                </div>
               </form>
 
-              <div className="text-sm text-gray-500 pt-4 border-t border-gray-100 dark:border-gray-700">
-                <div className="mb-4 space-y-3">
-                  <div className="flex items-center justify-between px-1 border-b border-gray-100 dark:border-gray-700 pb-3">
-                    <span className="font-medium text-gray-700 dark:text-gray-300">Show Syllables</span>
+              <div className="text-sm pt-6 border-t border-slate-200/50 dark:border-white/5 space-y-4">
+                <div className="bg-white/40 dark:bg-slate-900/40 border border-slate-200/50 dark:border-white/5 rounded-2xl p-4 shadow-sm space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-slate-700 dark:text-slate-300 text-xs tracking-wide">Show Syllables</span>
                     <button 
                       onClick={() => setShowSyllables(!showSyllables)}
-                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${showSyllables ? 'bg-blue-500' : 'bg-gray-200 dark:bg-gray-700'}`}
+                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:focus:ring-offset-slate-900 focus:ring-offset-1 ${showSyllables ? 'bg-indigo-500 hover:shadow-[0_0_8px_rgba(99,102,241,0.3)]' : 'bg-slate-300 dark:bg-slate-600'}`}
                       role="switch"
                       aria-checked={showSyllables}
                     >
@@ -1103,11 +1474,11 @@ const SessionEditor = () => {
                     </button>
                   </div>
                   
-                  <div className="flex items-center justify-between px-1 border-b border-gray-100 dark:border-gray-700 pb-3">
-                    <span className="font-medium text-gray-700 dark:text-gray-300">Show Rhymes</span>
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-slate-700 dark:text-slate-300 text-xs tracking-wide">Show Rhymes</span>
                     <button 
                       onClick={() => setShowRhymes(!showRhymes)}
-                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${showRhymes ? 'bg-indigo-500' : 'bg-gray-200 dark:bg-gray-700'}`}
+                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-purple-500/40 dark:focus:ring-offset-slate-900 focus:ring-offset-1 ${showRhymes ? 'bg-purple-500 hover:shadow-[0_0_8px_rgba(168,85,247,0.3)]' : 'bg-slate-300 dark:bg-slate-600'}`}
                       role="switch"
                       aria-checked={showRhymes}
                     >
@@ -1115,32 +1486,32 @@ const SessionEditor = () => {
                     </button>
                   </div>
 
-                  <div className="flex items-center justify-between px-1">
-                    <span className="font-medium text-gray-700 dark:text-gray-300">Show Rhyme Scheme</span>
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-slate-700 dark:text-slate-300 text-xs tracking-wide">Rhyme Scheme</span>
                     <button 
                       onClick={() => setShowRhymeScheme(!showRhymeScheme)}
-                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${showRhymeScheme ? 'bg-teal-500' : 'bg-gray-200 dark:bg-gray-700'}`}
+                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] dark:focus:ring-offset-slate-900 focus:ring-offset-1 ${showRhymeScheme ? 'bg-[var(--accent-primary)] hover:brightness-110' : 'bg-slate-300 dark:bg-slate-600'}`}
                       role="switch"
                       aria-checked={showRhymeScheme}
                     >
                       <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${showRhymeScheme ? 'translate-x-4' : 'translate-x-0'}`} />
                     </button>
                   </div>
-                  
-                  <button 
-                    onClick={handleFindRhymes}
-                    className="w-full bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 font-medium py-2 rounded border border-indigo-100 dark:border-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors"
-                  >
-                    Find Rhymes
-                  </button>
-                  
-                  {rhymeError && (
-                    <div className="text-xs text-red-500 mt-2">{rhymeError}</div>
-                  )}
                 </div>
+                  
+                <button 
+                  onClick={handleFindRhymes}
+                  className="w-full bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-cyan-300 font-bold py-2.5 rounded-xl border border-indigo-200 dark:border-indigo-500/20 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 transition-all shadow-sm tracking-wide text-xs uppercase"
+                >
+                  Find Rhymes
+                </button>
+                
+                {rhymeError && (
+                  <div className="text-xs text-red-500 font-medium px-2 mt-2">{rhymeError}</div>
+                )}
                 
                 {currentWord && !rhymeError && (
-                  <div className="mt-3 mb-4 space-y-2">
+                  <div className="mt-4 mb-4 space-y-2">
                     <div className="text-xs text-gray-400">Rhymes for: <span className="font-semibold text-gray-600 dark:text-gray-300">{currentWord}</span></div>
                     {isFetchingRhymes ? (
                       <div className="text-xs text-gray-400">Loading...</div>
@@ -1167,17 +1538,47 @@ const SessionEditor = () => {
                 <div>Characters: {characterCount}</div>
               </div>
             </div>
+            </>
+            )}
 
             {/* Existing Sections Workspace (Right Column) */}
-            {/* Removed overflow-hidden to stop clipping stacking contexts */}
-            <div className="flex flex-col bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
-              
-              {/* Tabs UI */}
-              <div className="flex items-end overflow-x-auto whitespace-nowrap pt-2 px-2 bg-gray-100 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 min-h-[46px] relative z-20">
+            <div className={`flex flex-col relative min-w-0 transition-all duration-200 ease-in-out`}>
+
+              {/* Shared Parent Container */}
+              <div className="flex flex-col h-full relative z-0">
+
+              {/* Mobile Draft Switcher Trigger */}
+              {!isFocusMode && (
+                <div className="sm:hidden px-2 pb-2 mt-4 flex items-center">
+                  <button 
+                    onClick={() => setIsBottomSheetOpen(true)}
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-bold shadow-[0_1px_2px_rgba(0,0,0,0.05)] active:scale-[0.98] transition-all"
+                    style={{ background: 'var(--bg-elevated)', color: 'var(--text-main)', border: '1px solid var(--bg-border)' }}
+                  >
+                    <span className="truncate max-w-[150px]">{drafts[activeDraftIndex]?.name || 'Drafts'}</span>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M6 9l6 6 6-6"/></svg>
+                  </button>
+                </div>
+              )}
+
+              {/* Tab Bar */}
+              {!isFocusMode && (
+              <div
+                className="hidden sm:flex items-end flex-wrap relative z-10"
+                style={{
+                  // Tab tray sits directly on top of the editor container
+                  padding: '0 16px',
+                  gap: '4px',
+                  marginBottom: '0', // No gap, let editor pull up
+                  overflow: 'visible',
+                  height: 'auto',
+                  borderBottom: '1px solid var(--tab-container-border)',
+                }}
+              >
                 <DndContext collisionDetection={closestCenter} sensors={sensors} onDragEnd={handleDragEnd}>
                   <SortableContext items={drafts.map((draft, index) => index)} strategy={horizontalListSortingStrategy}>
                     {drafts.map((draft, idx) => (
-                      <SortableTab 
+                      <SortableTab
                         key={idx}
                         id={idx}
                         draft={draft}
@@ -1204,139 +1605,388 @@ const SessionEditor = () => {
                     ))}
                   </SortableContext>
                 </DndContext>
-                <button 
+
+                {/* + Draft action — completely inline with tabs */}
+                <button
                   onClick={() => {
                     const newDraftName = `Draft ${drafts.length + 1}`;
                     setDrafts([...drafts, { id: Math.random().toString(36).substring(2, 9), name: newDraftName, content: '' }]);
                     setActiveDraftIndex(drafts.length);
                   }}
-                  className="shrink-0 px-3 py-2 mb-px ml-1 text-sm font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
+                  className="draft-add shrink-0 flex items-center px-3 py-2.5 outline-none"
                 >
-                  + Draft
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                  </svg>
+                  Draft
                 </button>
               </div>
+              )}
 
-              <div className="p-4 flex flex-col flex-1 h-full">
-                <div className="flex justify-between items-center mb-4">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Editor
-                    <span className="ml-4 font-normal text-xs text-gray-400 dark:text-gray-500">
-                      {isSaving ? '● Saving...' : lastSaved ? '✓ All changes saved' : ''}
+              {/* Editor Container */}
+              <div
+                className={`flex flex-col flex-1 h-full relative transition-all duration-200`}
+                style={isFocusMode ? {} : {
+                  marginTop: '-1px', // Merge border with tab
+                  zIndex: 1,
+                  background: 'var(--editor-bg)',
+                  borderRadius: '12px',
+                  boxShadow: 'var(--editor-shadow)',
+                  border: '1px solid var(--editor-border)',
+                  overflow: 'hidden',
+                }}
+              >
+                {/* ── Editor Toolbar ── */}
+                <div
+                  className="px-3 md:px-8 py-3 border-b border-slate-200/50 dark:border-white/5 transition-opacity duration-200"
+                  style={{ background: 'transparent' }}
+                >
+
+                  {/* ── MOBILE: single clean row ── */}
+                  <div className="flex sm:hidden items-center justify-between gap-2" style={{ minWidth: 0 }}>
+
+                    {/* Left: Auto-save indicator */}
+                    <span className="text-xs font-semibold text-indigo-500 dark:text-cyan-400 shrink-0 min-w-0 truncate" style={{ maxWidth: '70px' }}>
+                      {isSaving ? '● Saving' : lastSaved ? '✓ Saved' : ''}
                     </span>
-                  </label>
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2 mr-2">
-                      <button
-                        onClick={startRecording}
-                        disabled={isRecording}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-sm font-medium transition-colors ${
-                          isRecording 
-                            ? 'bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-500 cursor-not-allowed' 
-                            : 'bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800/50 dark:hover:bg-red-900/50'
-                        }`}
-                      >
-                        <span className={`h-2 w-2 rounded-full ${isRecording ? 'bg-gray-400 dark:bg-gray-500' : 'bg-red-500'}`}></span>
-                        Record
-                      </button>
-                      <button
-                        onClick={stopRecording}
-                        disabled={!isRecording}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-sm font-medium transition-colors ${
-                          !isRecording 
-                            ? 'bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-500 cursor-not-allowed' 
-                            : 'bg-gray-800 text-white hover:bg-gray-900 dark:bg-gray-200 dark:text-gray-900 dark:hover:bg-white'
-                        }`}
-                      >
-                        <span className="h-2 w-2 rounded-sm bg-current"></span>
-                        Stop
-                      </button>
-                      {isRecording && recordingMode && (
-                        <span className={`flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full ${
-                          recordingMode === 'mic+beat'
-                            ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400'
-                            : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-400'
-                        }`}>
-                          <span className="animate-pulse h-1.5 w-1.5 rounded-full bg-current"></span>
-                          {recordingMode === 'mic+beat' ? 'Mic + Beat' : 'Mic Only'}
-                        </span>
+
+                    {/* Centre-right controls: Align | Record/Stop | + Section */}
+                    <div className="flex items-center gap-2 shrink-0">
+
+                      {/* Align Dropdown — compact */}
+                      <div style={{ width: '100px' }}>
+                        <Dropdown
+                          compact
+                          value={textAlign}
+                          onChange={(val) => setTextAlign(val)}
+                          options={[
+                            { value: 'left', label: 'Align Left' },
+                            { value: 'center', label: 'Align Center' },
+                            { value: 'right', label: 'Align Right' }
+                          ]}
+                        />
+                      </div>
+
+                      {/* Record / Stop toggle */}
+                      {!isGuest ? (
+                        <button
+                          id="mobile-record-toggle"
+                          onClick={isRecording ? stopRecording : startRecording}
+                          className="shrink-0 flex items-center gap-1.5 px-3 rounded-lg text-sm font-bold transition-all"
+                          style={{
+                            height: '36px',
+                            border: isRecording
+                              ? '1px solid rgba(239,68,68,0.35)'
+                              : '1px solid rgba(239,68,68,0.25)',
+                            background: isRecording
+                              ? 'rgba(239,68,68,0.12)'
+                              : 'rgba(239,68,68,0.08)',
+                            color: isRecording ? '#ef4444' : '#dc2626',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {isRecording ? (
+                            <>
+                              {/* Stop icon square */}
+                              <span style={{ display: 'inline-block', width: '9px', height: '9px', background: 'currentColor', borderRadius: '2px', flexShrink: 0 }} />
+                              Stop
+                            </>
+                          ) : (
+                            <>
+                              {/* Record dot */}
+                              <span style={{ display: 'inline-block', width: '9px', height: '9px', background: '#ef4444', borderRadius: '50%', flexShrink: 0, animation: 'none' }} />
+                              Record
+                            </>
+                          )}
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => navigate('/signup')}
+                          className="shrink-0 flex items-center gap-1.5 px-3 rounded-lg text-sm font-bold transition-all"
+                          style={{
+                            height: '36px',
+                            border: '1px solid rgba(217,119,6,0.25)',
+                            background: 'rgba(217,119,6,0.08)',
+                            color: '#d97706',
+                            whiteSpace: 'nowrap',
+                          }}
+                          title="Create a free account to unlock recording"
+                        >
+                          <Mic2 size={13} />
+                          Record
+                        </button>
                       )}
+
+                      {/* + Section Dropdown */}
+                      <div className="shrink-0" style={{ width: '106px' }}>
+                        <Dropdown
+                          compact
+                          value=""
+                          onChange={(val) => { if (val) insertSection(val); }}
+                          placeholder="+ Section"
+                          options={[
+                            { value: 'Hook', label: 'Hook' },
+                            { value: 'Verse', label: 'Verse' },
+                            { value: 'Bridge', label: 'Bridge' },
+                            { value: 'Intro', label: 'Intro' },
+                            { value: 'Outro', label: 'Outro' }
+                          ]}
+                        />
+                      </div>
                     </div>
-                    <select 
-                      className="bg-gray-100 dark:bg-gray-800 text-sm p-2 rounded outline-none text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-700"
-                      onChange={(e) => {
-                        if (e.target.value) {
-                          insertSection(e.target.value);
-                          e.target.value = '';
-                        }
-                      }}
-                      defaultValue=""
-                    >
-                      <option value="" disabled>+ Add Section</option>
-                      <option value="Hook">Hook</option>
-                      <option value="Verse">Verse</option>
-                      <option value="Bridge">Bridge</option>
-                      <option value="Intro">Intro</option>
-                      <option value="Outro">Outro</option>
-                    </select>
                   </div>
+
+                  {/* Recording mode pill — mobile only, shown below the row when active */}
+                  {isRecording && recordingMode && (
+                    <div className="sm:hidden mt-2 flex items-center gap-1.5">
+                      <span className={`flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider px-3 py-1 rounded-full border ${
+                        recordingMode === 'mic+beat'
+                          ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:text-emerald-400'
+                          : 'bg-amber-500/10 text-amber-600 border-amber-500/20 dark:text-amber-400'
+                      }`}>
+                        <span className="animate-pulse h-1.5 w-1.5 rounded-full bg-current"></span>
+                        {recordingMode === 'mic+beat' ? 'Mic + Beat' : 'Mic Only'}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* ── DESKTOP: full toolbar ── */}
+                  <div className="hidden sm:flex sm:flex-row sm:justify-between items-center gap-3">
+                    <div className="flex items-center justify-between w-full sm:w-auto">
+                      <span className="text-xs font-semibold text-indigo-500 dark:text-cyan-400">
+                        {isSaving ? '● Auto-saving...' : lastSaved ? '✓ Saved' : ''}
+                      </span>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2 max-w-full">
+                      {/* Focus Mode — desktop */}
+                      <button
+                        onClick={() => setIsFocusMode(!isFocusMode)}
+                        className="flex px-3 py-1.5 items-center gap-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all shadow-[0_1px_2px_rgba(0,0,0,0.04)]"
+                        style={{ border: '1px solid var(--bg-border)', color: isFocusMode ? 'var(--accent-primary)' : 'var(--text-muted)', background: 'transparent' }}
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
+                        {isFocusMode ? 'Exit Focus' : 'Focus Mode'}
+                      </button>
+
+                      {/* Focus Mode — mobile (inside desktop column to keep DOM order clean) */}
+                      <button
+                        onClick={() => setIsFocusMode(!isFocusMode)}
+                        className="sm:hidden px-2 py-1.5 flex items-center gap-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all shadow-[0_1px_2px_rgba(0,0,0,0.04)]"
+                        style={{ border: '1px solid var(--bg-border)', color: isFocusMode ? 'var(--accent-primary)' : 'var(--text-muted)', background: 'transparent' }}
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
+                        {isFocusMode && 'Exit'}
+                      </button>
+
+                      <div className="w-[125px]">
+                        <Dropdown
+                          value={textAlign}
+                          onChange={(val) => setTextAlign(val)}
+                          options={[
+                            { value: 'left', label: 'Align Left' },
+                            { value: 'center', label: 'Align Center' },
+                            { value: 'right', label: 'Align Right' }
+                          ]}
+                        />
+                      </div>
+
+                      <div className="h-6 w-px" style={{ background: 'var(--bg-border)' }}></div>
+
+                      <div className="flex items-center gap-2">
+                        {!isGuest ? (
+                          <>
+                            <button
+                              id="desktop-record-toggle"
+                              onClick={isRecording ? stopRecording : startRecording}
+                              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all shadow-[0_1px_2px_rgba(0,0,0,0.04)] border ${
+                                isRecording
+                                  ? 'bg-red-500/10 text-red-500 border-red-500/20 animate-pulse'
+                                  : 'bg-red-500/10 text-red-600 hover:bg-red-500 hover:text-white border-red-500/20 dark:bg-red-500/20 dark:text-red-400 dark:border-red-500/30'
+                              }`}
+                            >
+                              {isRecording ? (
+                                <>
+                                  <span className="h-2.5 w-2.5 rounded-sm bg-current"></span>
+                                  Stop
+                                </>
+                              ) : (
+                                <>
+                                  <span className="h-2.5 w-2.5 rounded-full bg-red-500 animate-pulse"></span>
+                                  Rec
+                                </>
+                              )}
+                            </button>
+                            {isRecording && recordingMode && (
+                              <span className={`flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider px-3 py-1.5 rounded-full border ${
+                                recordingMode === 'mic+beat'
+                                  ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:text-emerald-400'
+                                  : 'bg-amber-500/10 text-amber-600 border-amber-500/20 dark:text-amber-400'
+                              }`}>
+                                <span className="animate-pulse h-1.5 w-1.5 rounded-full bg-current"></span>
+                                {recordingMode === 'mic+beat' ? 'Mic + Beat' : 'Mic Only'}
+                              </span>
+                            )}
+                          </>
+                        ) : (
+                          <button
+                            onClick={() => navigate('/signup')}
+                            className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-500/10 text-amber-600 border border-amber-500/20 shadow-sm hover:bg-amber-500/20 transition-colors cursor-pointer"
+                            title="Create a free account to unlock recording"
+                          >
+                            <Mic2 size={14} className="opacity-70" />
+                            <span className="text-[10px] uppercase tracking-wider font-bold">Sign up to Record</span>
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="w-[140px]">
+                        <Dropdown
+                          value=""
+                          onChange={(val) => { if (val) insertSection(val); }}
+                          placeholder="+ Section"
+                          options={[
+                            { value: 'Hook', label: 'Hook' },
+                            { value: 'Verse', label: 'Verse' },
+                            { value: 'Bridge', label: 'Bridge' },
+                            { value: 'Intro', label: 'Intro' },
+                            { value: 'Outro', label: 'Outro' }
+                          ]}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
                 </div>
                 <style>{`
                   .cm-section-header {
-                    color: #8b5cf6; /* Tailwind purple-500 */
-                    font-weight: 700;
-                    padding: 2px 4px;
-                    margin-left: -4px;
+                    color: var(--accent-primary);
+                    font-weight: 500;
+                    font-family: 'Outfit', sans-serif;
+                    letter-spacing: 0.05em;
+                    text-transform: uppercase;
+                    padding: 4px 8px;
+                    margin-left: -8px;
                     transition: all 0.2s ease;
+                    display: inline-block;
+                    margin-top: 20px;
+                    margin-bottom: 6px;
+                    opacity: 0.9;
                   }
                   .dark .cm-section-header {
-                    color: #a78bfa; /* Tailwind purple-400 */
+                    color: var(--accent-primary);
                   }
                   
                   .cm-active-section {
-                    background: rgba(59,130,246,0.15); /* Tailwind blue-500 with 15% opacity */
-                    border-radius: 4px;
+                    background: rgba(64, 138, 113, 0.08);
+                    border-radius: 6px;
+                    border-left: 3px solid var(--accent-primary);
                   }
                   .dark .cm-active-section {
-                    background: rgba(96,165,250,0.2); /* Tailwind blue-400 with 20% opacity */
+                    background: rgba(64, 138, 113, 0.12);
+                    border-left: 3px solid var(--accent-primary);
+                  }
+
+                  .cm-activeLine {
+                    background: transparent !important;
+                  }
+                  .cm-cursor {
+                    border-left-color: var(--accent-primary) !important;
+                    border-left-width: 2px !important;
                   }
                   
-                  .cm-syl-0 { color: #f87171 !important; } /* red-400 */
-                  .cm-syl-1 { color: #60a5fa !important; } /* blue-400 */
-                  .cm-syl-2 { color: #4ade80 !important; } /* green-400 */
-                  .cm-syl-3 { color: #facc15 !important; } /* yellow-400 */
-                  .cm-syl-4 { color: #c084fc !important; } /* purple-400 */
+                  .cm-syl-0 { color: #f87171 !important; }
+                  .cm-syl-1 { color: #818cf8 !important; }
+                  .cm-syl-2 { color: #34d399 !important; }
+                  .cm-syl-3 { color: #fbbf24 !important; }
+                  .cm-syl-4 { color: #c084fc !important; }
                   
-                  .cm-rhyme-0 { text-decoration: underline 2px #ef4444 !important; } /* red-500 */
-                  .cm-rhyme-1 { text-decoration: underline 2px #3b82f6 !important; } /* blue-500 */
-                  .cm-rhyme-2 { text-decoration: underline 2px #10b981 !important; } /* emerald-500 */
-                  .cm-rhyme-3 { text-decoration: underline 2px #eab308 !important; } /* yellow-500 */
+                  .cm-rhyme-0 { text-decoration: underline 2px #ef4444 !important; }
+                  .cm-rhyme-1 { text-decoration: underline 2px #6366f1 !important; }
+                  .cm-rhyme-2 { text-decoration: underline 2px #10b981 !important; }
+                  .cm-rhyme-3 { text-decoration: underline 2px #f59e0b !important; }
                   
                   .cm-rhyme-scheme {
                     font-size: 12px;
-                    color: #9ca3af;
+                    color: var(--accent-primary);
                     margin-left: 8px;
-                    font-weight: 600;
+                    font-weight: 700;
+                    background: rgba(64, 138, 113, 0.1);
+                    padding: 2px 6px;
+                    border-radius: 4px;
                   }
                   .dark .cm-rhyme-scheme {
-                    color: #6b7280;
+                    color: var(--accent-primary);
+                    background: rgba(64, 138, 113, 0.15);
+                  }
+                  
+                  .editor-wrapper {
+                    width: 100%;
+                    display: flex;
+                    justify-content: center;
+                    padding: 0;
+                  }
+                  
+                  @media (min-width: 768px) {
+                    .editor-wrapper {
+                      padding: 0 48px;
+                    }
+                  }
+
+                  .focus-mode.editor-wrapper {
+                    padding: 0 16px;
+                    justify-content: center !important;
+                  }
+                  .focus-mode .cm-editor {
+                    max-width: 1100px !important;
                   }
                   
                   .cm-editor {
+                    width: 100%;
+                    max-width: 1000px;
                     height: 100%;
-                    background-color: transparent;
+                    background: transparent !important;
+                    border-radius: 0;
                     font-family: inherit;
-                    font-size: 16px;
+                    font-size: 15.5px;
+                    line-height: 1.8;
+                    letter-spacing: 0.015em;
+                  }
+                  .dark .cm-editor {
+                    background: transparent !important;
                   }
                   .cm-scroller {
                     overflow: auto;
                     height: 100%;
+                    background: transparent !important;
+                    /* Hide scrollbar for a cleaner look */
+                    scrollbar-width: none;
+                  }
+                  .cm-scroller::-webkit-scrollbar {
+                    display: none;
                   }
                   .cm-content {
-                    padding: 1rem 0;
+                    font-size: 17px;
+                    line-height: 1.85;
+                    letter-spacing: 0.01em;
+                    caret-color: var(--accent-primary);
+                    margin: 0 !important;
+                    padding: 16px 8px !important;
                     min-height: 400px;
+                    text-align: ${textAlign} !important;
+                  }
+
+                  @media (min-width: 768px) {
+                    .cm-content {
+                      padding: 24px 28px !important;
+                      font-size: 18px;
+                    }
                   }
                   .cm-line {
                     padding: 0;
+                    opacity: 1 !important;
+                    font-weight: 400 !important;
                   }
                   .cm-gutters {
                     display: none;
@@ -1344,8 +1994,13 @@ const SessionEditor = () => {
                   .cm-focused {
                     outline: none !important;
                   }
+                  .cm-editor:focus,
+                  .cm-editor:focus-visible,
+                  .cm-scroller:focus {
+                    outline: none !important;
+                  }
                 `}</style>
-                <div className="flex-1 w-full bg-gray-50 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-700 rounded-lg focus-within:ring-2 focus-within:ring-blue-500 transition-colors p-4" style={{ height: '600px', overflowY: 'auto' }}>
+                <div className={`editor-wrapper ${isFocusMode ? 'focus-mode' : ''} flex-1 transition-all duration-200 ease-in-out bg-transparent border-none`} style={{ height: '600px', overflowY: 'auto' }}>
                   
                   <CodeMirror
                     onCreateEditor={(view) => {
@@ -1370,82 +2025,152 @@ const SessionEditor = () => {
                     className={`relative z-10 w-full font-mono leading-relaxed text-gray-900 dark:text-white transition-colors`}
                   />
                 </div>
-                
-                {/* Audio Takes Display */}
-                {takes.length > 0 && (
-                  <div className="mt-6 border-t border-gray-200 dark:border-gray-700 pt-4">
-                    <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
-                      <span className="text-xl">🎤</span> Takes ({takes.length})
-                    </h3>
-                    <div className="space-y-3">
-                      {takes.map((take, index) => {
-                        const takeIdentifier = take._id || take.id;
-                        return (
-                        <div key={takeIdentifier} className="flex items-center gap-4 bg-gray-50 dark:bg-gray-800/80 p-3 rounded-lg border border-gray-100 dark:border-gray-700">
-                          {editingTakeId === takeIdentifier ? (
-                            <input
-                              autoFocus
-                              type="text"
-                              value={editingTakeName}
-                              onChange={(e) => setEditingTakeName(e.target.value)}
-                              onBlur={() => handleRenameTakeSubmit(takeIdentifier)}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') handleRenameTakeSubmit(takeIdentifier);
-                                if (e.key === 'Escape') setEditingTakeId(null);
-                              }}
-                              className="text-sm font-semibold bg-white dark:bg-gray-900 border border-blue-500 rounded px-2 py-1 outline-none min-w-[100px]"
-                            />
-                          ) : (
-                            <span 
-                              className="text-sm font-semibold text-gray-600 dark:text-gray-400 min-w-[100px] cursor-text hover:text-blue-500 transition-colors"
-                              onDoubleClick={() => {
-                                setEditingTakeId(takeIdentifier);
-                                setEditingTakeName(take.name || `Take ${index + 1}`);
-                              }}
-                              title="Double click to rename"
-                            >
-                              {take.name || `Take ${index + 1}`}
-                            </span>
-                          )}
-                          
-                          <button
-                            onClick={() => handlePlayTakeSync(takeIdentifier)}
-                            className="bg-blue-100 text-blue-600 hover:bg-blue-200 dark:bg-blue-900/40 dark:text-blue-400 dark:hover:bg-blue-900/60 rounded-full w-8 h-8 flex items-center justify-center transition-colors shadow-sm"
-                            title="Play synced with beat"
-                          >
-                            ▶
-                          </button>
-                          
-                          <audio data-take-id={takeIdentifier} controls src={take.url} className="h-8 flex-1 outline-none" />
-                          
-                          {take.isUploading && (
-                             <span className="text-xs text-blue-500 animate-pulse">Uploading...</span>
-                          )}
-                          {take.error && (
-                             <span className="text-xs text-red-500">Upload failed</span>
-                          )}
-                          
-                          <button
-                            onClick={() => setTakes(takes.filter(t => t._id !== takeIdentifier && t.id !== takeIdentifier))}
-                            className="text-gray-400 hover:text-red-500 transition-colors p-1 ml-2"
-                            title="Delete take"
-                          >
-                            &times;
-                          </button>
-                        </div>
-                      )})}
-                    </div>
-                  </div>
-                )}
               </div>
+              </div>
+
+              {/* Audio Takes Display */}
+              {!isFocusMode && takes.length > 0 && (
+                <div style={{ marginTop: '16px', padding: '16px 20px', borderRadius: '16px', background: 'var(--take-container-bg)', border: '1px solid var(--take-container-border)', boxShadow: 'var(--take-container-shadow)' }}>
+                  <button 
+                    onClick={() => setIsRecordedTakesOpen(!isRecordedTakesOpen)}
+                    style={{ fontSize: '12px', fontWeight: 500, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--take-header-color)', width: '100%', textAlign: 'left', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', background: 'transparent', border: 'none', padding: 0 }}
+                  >
+                    <span>Recorded Takes ({takes.length})</span>
+                    <svg 
+                      width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" 
+                      style={{ transform: isRecordedTakesOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s ease' }}
+                    >
+                      <path d="M6 9l6 6 6-6" />
+                    </svg>
+                  </button>
+                  
+                  {isRecordedTakesOpen && (
+                    <div className="space-y-[12px] mt-4">
+                    {takes.map((take, index) => (
+                      <TakeCard
+                        key={take._id || take.id}
+                        take={take}
+                        index={index}
+                        editingTakeId={editingTakeId}
+                        editingTakeName={editingTakeName}
+                        setEditingTakeName={setEditingTakeName}
+                        handleRenameTakeSubmit={handleRenameTakeSubmit}
+                        setEditingTakeId={setEditingTakeId}
+                        handlePlayTakeSync={handlePlayTakeSync}
+                        onDelete={(takeIdentifier) => setTakes(takes.filter(t => t._id !== takeIdentifier && t.id !== takeIdentifier))}
+                        recordingMode={recordingMode}
+                      />
+                    ))}
+                  </div>
+                  )}
+                </div>
+              )}
             </div>
             
           </div>
 
         </div>
       </div>
+
+      {/* Mobile Draft Bottom Sheet */}
+      {isBottomSheetOpen && (
+        <div className="fixed inset-0 z-[100] flex flex-col justify-end sm:hidden">
+          {/* Backdrop */}
+          <div 
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity"
+            onClick={() => setIsBottomSheetOpen(false)}
+          ></div>
+          
+          {/* Sheet */}
+          <div 
+            className="relative w-full shadow-xl flex flex-col max-h-[85vh]"
+            style={{ background: 'var(--bg-main)', borderRadius: '24px 24px 0 0', transform: 'translateY(0)', animation: 'slideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards' }}
+          >
+            <style>{`
+              @keyframes slideUp {
+                from { transform: translateY(100%); }
+                to { transform: translateY(0); }
+              }
+            `}</style>
+
+            {/* Grabber */}
+            <div className="w-full flex justify-center py-4 cursor-pointer" onClick={() => setIsBottomSheetOpen(false)}>
+              <div className="w-12 h-1.5 rounded-full" style={{ background: 'var(--bg-border)' }}></div>
+            </div>
+            
+            <div className="px-6 pb-2 text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+              Drafts
+            </div>
+            
+            <div className="overflow-y-auto px-4 pb-8 flex-col space-y-1">
+              {drafts.map((draft, idx) => (
+                <div key={draft.id || idx} className="w-full flex justify-between items-center group rounded-2xl p-1">
+                  <button 
+                    className="flex-1 flex items-center justify-between p-3.5 rounded-xl transition-colors text-left"
+                    style={{ 
+                      background: activeDraftIndex === idx ? 'var(--bg-elevated)' : 'transparent',
+                      color: activeDraftIndex === idx ? 'var(--accent-primary)' : 'var(--text-main)',
+                      fontWeight: activeDraftIndex === idx ? '800' : '600'
+                    }}
+                    onClick={() => {
+                      setActiveDraftIndex(idx);
+                      setIsBottomSheetOpen(false);
+                    }}
+                  >
+                    <span className="truncate text-[15px]">{draft.name}</span>
+                    {activeDraftIndex === idx && (
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M20 6L9 17l-5-5"/></svg>
+                    )}
+                  </button>
+                  
+                  {/* Delete option for inactive drafts */}
+                  {activeDraftIndex !== idx ? (
+                    <button
+                      className="p-3.5 rounded-xl ml-1 transition-colors"
+                      style={{ color: 'var(--text-muted)' }}
+                      onMouseEnter={(e) => { e.currentTarget.style.color = '#ef4444'; e.currentTarget.style.background = 'rgba(239,68,68,0.1)'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.background = 'transparent'; }}
+                      onClick={() => {
+                        if(confirm(`Delete '${draft.name}'?`)) {
+                           const newDrafts = drafts.filter((_, idxToRemove) => idx !== idxToRemove);
+                           setDrafts(newDrafts);
+                           if (activeDraftIndex > idx) {
+                             setActiveDraftIndex(activeDraftIndex - 1);
+                           }
+                        }
+                      }}
+                    >
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+                    </button>
+                  ) : (
+                    <div className="w-[46px]"></div> /* Placeholder to keep text aligned */
+                  )}
+                </div>
+              ))}
+              
+              <div className="pt-3 pb-2 mt-2 border-t" style={{ borderColor: 'var(--bg-border)' }}>
+                <button
+                  className="w-full text-left p-3.5 rounded-xl text-[15px] font-bold transition-colors flex items-center gap-3"
+                  style={{ color: 'var(--accent-primary)' }}
+                  onClick={() => {
+                    const newDraftName = `Draft ${drafts.length + 1}`;
+                    setDrafts([...drafts, { id: Math.random().toString(36).substring(2, 9), name: newDraftName, content: '' }]);
+                    setActiveDraftIndex(drafts.length);
+                    setIsBottomSheetOpen(false);
+                  }}
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                  New Draft
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
 
 export default SessionEditor;
+

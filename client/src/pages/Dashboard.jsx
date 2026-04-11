@@ -1,33 +1,39 @@
 import { useNavigate } from 'react-router-dom';
 import { Link } from 'react-router-dom';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import SessionCard from '../components/SessionCard';
 import { getToken } from '../utils/auth';
 import useSessions from '../hooks/useSessions';
+import Dropdown from '../components/ui/Dropdown';
+import { Search, Mic } from 'lucide-react';
 
 const Dashboard = () => {
   const navigate = useNavigate();
   const { sessions, sortedSessions, loading, error, query, setQuery, sortOption, setSortOption, removeSession } = useSessions();
+  const [sessionToDelete, setSessionToDelete] = useState(null);
 
   useEffect(() => {
     if (!getToken()) {
       navigate('/login');
     }
-  }, []);
+  }, [navigate]);
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors p-8">
+    <div className="min-h-[calc(100vh-73px)] p-4 md:p-10" style={{ background: 'var(--bg-main)' }}>
       <div className="max-w-6xl mx-auto">
         
         {/* Header Section */}
-        <div className="flex justify-between items-center mb-8">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-100">Your Sessions</h1>
-            <p className="text-gray-600 dark:text-gray-400 mt-1">Manage your songwriting drafts</p>
+            <h1 className="font-display text-4xl font-bold tracking-tight" style={{ color: 'var(--text-main)' }}>Your Sessions</h1>
+            <p className="mt-2 text-lg" style={{ color: 'var(--text-muted)' }}>Manage your songwriting drafts and studio takes.</p>
           </div>
           <Link 
             to="/session/new"
-            className="bg-blue-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors shadow-sm"
+            className="text-white px-6 py-3 rounded-lg font-medium transition-all w-full md:w-auto text-center"
+            style={{ background: 'var(--accent-primary)' }}
+            onMouseEnter={(e) => e.currentTarget.style.opacity = '0.85'}
+            onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
           >
             Create New Session
           </Link>
@@ -35,51 +41,125 @@ const Dashboard = () => {
 
         {/* Search + Sort */}
         {!loading && !error && (
-          <div className="flex items-center mb-6">
-            <input
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search sessions..."
-              className="w-full max-w-md border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white dark:bg-gray-800 text-gray-900 dark:text-white transition-colors"
-            />
-            <select
-              value={sortOption}
-              onChange={(e) => setSortOption(e.target.value)}
-              className="border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 ml-4 focus:ring-2 focus:ring-blue-500 outline-none bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 transition-colors"
-            >
-              <option value="newest">Newest</option>
-              <option value="oldest">Oldest</option>
-              <option value="az">A–Z</option>
-              <option value="za">Z–A</option>
-            </select>
+          <div className="flex flex-col sm:flex-row items-center gap-4 mb-8">
+            <div className="relative w-full sm:w-96">
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search sessions..."
+                className="w-full rounded-lg pl-10 pr-4 py-3 outline-none transition-all"
+                style={{ background: 'var(--bg-elevated)', border: '1px solid var(--bg-border)', color: 'var(--text-main)' }}
+                onFocus={(e) => e.target.style.borderColor = 'var(--accent-primary)'}
+                onBlur={(e) => e.target.style.borderColor = 'var(--bg-border)'}
+              />
+              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--text-muted)' }}>
+                <Search size={16} strokeWidth={1.5} />
+              </span>
+            </div>
+            <div className="w-full sm:w-48">
+              <Dropdown
+                value={sortOption}
+                onChange={(val) => setSortOption(val)}
+                options={[
+                  { value: 'newest', label: 'Newest' },
+                  { value: 'oldest', label: 'Oldest' },
+                  { value: 'az', label: 'A–Z' },
+                  { value: 'za', label: 'Z–A' }
+                ]}
+              />
+            </div>
           </div>
         )}
 
         {/* Content Section */}
         {loading ? (
-          <p className="text-gray-500 dark:text-gray-400 text-center py-10">Loading sessions...</p>
+          <div className="flex justify-center items-center py-20">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2" style={{ borderColor: 'var(--accent-primary)' }}></div>
+          </div>
         ) : error ? (
-          <p className="text-red-500 text-center py-10">{error}</p>
+          <div className="p-6 text-center rounded-xl mt-8" style={{ background: 'var(--bg-surface)', border: '1px solid var(--bg-border)' }}>
+            <p className="font-medium" style={{ color: '#ef4444' }}>{error}</p>
+          </div>
         ) : sessions.length === 0 ? (
-          <div className="bg-white dark:bg-gray-800 rounded-xl p-12 text-center border border-gray-100 dark:border-gray-700 shadow-sm mt-8 transition-colors">
-            <h3 className="text-xl font-medium text-gray-800 dark:text-gray-200 mb-2">No sessions yet.</h3>
-            <p className="text-gray-500 dark:text-gray-400">Start writing your first track by creating a new session.</p>
+          <div className="p-16 text-center rounded-xl mt-8" style={{ background: 'var(--bg-surface)', border: '1px solid var(--bg-border)' }}>
+            <div className="mb-6 flex justify-center" style={{ color: 'var(--text-muted)', opacity: 0.4 }}>
+              <Mic size={48} strokeWidth={1} />
+            </div>
+            <h3 className="font-display text-2xl font-bold mb-3" style={{ color: 'var(--text-main)' }}>No sessions yet</h3>
+            <p className="max-w-md mx-auto mb-8 text-lg" style={{ color: 'var(--text-muted)' }}>Start your next track by creating a new session. Upload a beat, set the BPM, and write your draft.</p>
+            <Link 
+              to="/session/new"
+              className="inline-block text-white px-8 py-3 rounded-lg font-semibold transition-colors"
+              style={{ background: 'var(--accent-primary)' }}
+            >
+              Start Writing
+            </Link>
           </div>
         ) : sortedSessions.length === 0 ? (
-          <div className="bg-white dark:bg-gray-800 rounded-xl p-12 text-center border border-gray-100 dark:border-gray-700 shadow-sm mt-8 transition-colors">
-            <h3 className="text-xl font-medium text-gray-800 dark:text-gray-200 mb-2">No sessions match your search.</h3>
-            <p className="text-gray-500 dark:text-gray-400">Try a different keyword.</p>
+          <div className="p-16 text-center rounded-xl mt-8" style={{ background: 'var(--bg-surface)', border: '1px solid var(--bg-border)' }}>
+            <h3 className="font-display text-xl font-bold mb-2" style={{ color: 'var(--text-main)' }}>No matching sessions</h3>
+            <p style={{ color: 'var(--text-muted)' }}>Try adjusting your search query.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6">
             {sortedSessions.map((session) => (
-              <SessionCard key={session._id} session={session} onDelete={removeSession} />
+              <SessionCard key={session._id} session={session} onDelete={() => setSessionToDelete(session)} />
             ))}
           </div>
         )}
 
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {sessionToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity" onClick={() => setSessionToDelete(null)} />
+          <div 
+            className="relative p-6 sm:p-8 w-full max-w-sm mx-4 shadow-2xl"
+            style={{ 
+              background: 'var(--bg-elevated)', 
+              border: '1px solid var(--bg-border)', 
+              borderRadius: '20px', 
+              animation: 'scaleUp 0.15s ease-out forwards' 
+            }}
+          >
+            <style>{`
+              @keyframes scaleUp {
+                from { transform: scale(0.95); opacity: 0; }
+                to { transform: scale(1); opacity: 1; }
+              }
+            `}</style>
+            <h3 className="text-xl font-display font-bold mb-2" style={{ color: 'var(--text-main)' }}>Delete Session</h3>
+            <p className="mb-6 text-sm" style={{ color: 'var(--text-muted)' }}>
+              Are you sure you want to delete "<span className="font-semibold" style={{ color: 'var(--text-main)' }}>{sessionToDelete.title}</span>"? This action cannot be undone.
+            </p>
+            <div className="flex gap-3 w-full">
+              <button 
+                onClick={() => setSessionToDelete(null)}
+                className="flex-1 py-2.5 rounded-xl font-medium transition-colors text-sm"
+                style={{ background: 'transparent', border: '1px solid var(--bg-border)', color: 'var(--text-muted)' }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-hover)'; e.currentTarget.style.color = 'var(--text-main)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-muted)'; }}
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={() => {
+                  removeSession(sessionToDelete._id);
+                  setSessionToDelete(null);
+                }}
+                className="flex-1 py-2.5 rounded-xl font-medium text-white transition-all shadow-sm text-sm"
+                style={{ background: '#ef4444' }}
+                onMouseEnter={(e) => e.currentTarget.style.background = '#dc2626'}
+                onMouseLeave={(e) => e.currentTarget.style.background = '#ef4444'}
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
